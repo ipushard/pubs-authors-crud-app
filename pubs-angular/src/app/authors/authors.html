@@ -8,352 +8,353 @@
       </p>
     </div>
 
-    <a class="btn btn-primary" [routerLink]="['/authors/new']">
-      + New Author
-    </a>
+
+<a class="btn btn-primary" [routerLink]="['/authors/new']" (click)="clearSuccessMessage()">
+  + New Author
+</a>
+
+
   </header>
 
   <section class="dashboard-grid">
 
-    <div class="dashboard-card">
-      <span class="dashboard-label">Records Showing</span>
-      <strong>{{ filteredAuthors.length }}</strong>
-      <span class="dashboard-note">after filters</span>
-    </div>
 
-    <div class="dashboard-card">
-      <span class="dashboard-label">Loaded Records</span>
-      <strong>{{ totalAuthors }}</strong>
-      <span class="dashboard-note">from database</span>
-    </div>
+<div class="dashboard-card">
+  <span class="dashboard-label">Records Showing</span>
+  <strong>{{ pagedAuthors.length }}</strong>
+  <span class="dashboard-note">after filters</span>
+</div>
 
-    <div class="dashboard-card">
-      <span class="dashboard-label">Active Records</span>
-      <strong>{{ activeAuthors }}</strong>
-      <span class="dashboard-note">not archived</span>
-    </div>
+<div class="dashboard-card">
+  <span class="dashboard-label">Loaded Records</span>
+  <strong>{{ totalAuthors }}</strong>
+  <span class="dashboard-note">from database</span>
+</div>
 
-    <div class="dashboard-card">
-      <span class="dashboard-label">Archived Records</span>
-      <strong>{{ archivedAuthors }}</strong>
-      <span class="dashboard-note">can be restored</span>
-    </div>
+<div class="dashboard-card">
+  <span class="dashboard-label">Active Records</span>
+  <strong>{{ activeAuthors }}</strong>
+  <span class="dashboard-note">not archived</span>
+</div>
 
-    <div class="dashboard-card dashboard-card-blue">
-      <span class="dashboard-label">Contract Signed</span>
-      <strong>{{ contractSigned }}</strong>
-      <span class="dashboard-note">yes contract</span>
-    </div>
+<div class="dashboard-card">
+  <span class="dashboard-label">Archived Records</span>
+  <strong>{{ archivedAuthors }}</strong>
+  <span class="dashboard-note">can be restored</span>
+</div>
 
-    <div class="dashboard-card dashboard-card-red">
-      <span class="dashboard-label">No Contract</span>
-      <strong>{{ contractNotSigned }}</strong>
-      <span class="dashboard-note">not signed</span>
-    </div>
+<div class="dashboard-card dashboard-card-blue">
+  <span class="dashboard-label">Contract Signed</span>
+  <strong>{{ contractSigned }}</strong>
+  <span class="dashboard-note">yes contract</span>
+</div>
+
+<div class="dashboard-card dashboard-card-red">
+  <span class="dashboard-label">No Contract</span>
+  <strong>{{ contractNotSigned }}</strong>
+  <span class="dashboard-note">not signed</span>
+</div>
+
 
   </section>
 
-  @if (errorMessage) {
-    <div class="message error-message">
-      {{ errorMessage }}
-    </div>
-  }
+@if (errorMessage) { <div class="message error-message">
+{{ errorMessage }} </div>
+}
 
-  @if (successMessage) {
-    <div class="message success-message">
-      {{ successMessage }}
-    </div>
-  }
+@if (successMessage) { <div class="message success-message">
+{{ successMessage }} </div>
+}
 
-  @if (isLoading) {
-    <div class="message loading-message">
-      Loading authors from database...
-    </div>
-  }
+@if (isLoading) { <div class="message loading-message">
+Loading authors from database... </div>
+}
 
   <section class="filter-card">
 
-    <button class="filter-toggle" type="button" (click)="toggleFilters()">
-      <span>Filter & Sort Authors</span>
 
-      @if (showFilters) {
-        <span class="filter-arrow">▲</span>
-      } @else {
-        <span class="filter-arrow">▼</span>
-      }
-    </button>
+<button class="filter-toggle" type="button" (click)="toggleFilters()">
+  <span>Filter & Sort Authors</span>
 
-    @if (showFilters) {
-      <div class="filter-panel">
+  @if (showFilters) {
+    <span class="filter-arrow">▲</span>
+  } @else {
+    <span class="filter-arrow">▼</span>
+  }
+</button>
 
-        <div class="filter-header">
-          <button class="btn btn-outline" type="button" (click)="clearFilters()">
-            Clear Filters
-          </button>
-        </div>
+@if (showFilters) {
+  <div class="filter-panel">
 
-        <div class="filter-grid">
+    <div class="filter-header">
+      <button class="btn btn-outline" type="button" (click)="clearFilters()">
+        Clear Filters
+      </button>
+    </div>
 
-          <label>
-                Record Status
-                <select
-                  class="filter-input"
-                  [(ngModel)]="recordStatus"
-                  (change)="onRecordStatusChange()">
-                  <option value="active">Active Records</option>
-                  <option value="archived">Archived Records</option>
-                  <option value="all">All Records</option>
-                </select>
-              </label>
+    <div class="filter-grid">
 
-          <label>
-            Search
-            <input
-              type="text"
-              class="filter-input"
-              placeholder="Search by name, ID, phone, city, state, or zip"
-              [(ngModel)]="searchTerm"
-              (input)="applyFiltersAndSort()">
-          </label>
-
-          <label>
-            Contract
+      <label>
+            Record Status
             <select
               class="filter-input"
-              [(ngModel)]="selectedContract"
-              (change)="applyFiltersAndSort()">
-              <option value="all">All</option>
-              <option value="yes">Contract Signed</option>
-              <option value="no">Contract Not Signed</option>
+              [(ngModel)]="recordStatus"
+              (change)="onRecordStatusChange()">
+              <option value="active">Active Records</option>
+              <option value="archived">Archived Records</option>
+              <option value="all">All Records</option>
             </select>
           </label>
 
-          <label>
-            State
-            <select
-              class="filter-input"
-              [(ngModel)]="selectedState"
-              (change)="applyFiltersAndSort()">
-              <option value="all">All States</option>
+      <label>
+        Search
+        <input
+          type="text"
+          class="filter-input"
+          placeholder="Search by name, ID, phone, city, state, or zip"
+          [(ngModel)]="searchTerm"
+          (input)="clearSuccessMessage(); applyFiltersAndSort()">
+      </label>
 
-              @for (state of availableStates; track state) {
-                <option [value]="state">{{ state }}</option>
-              }
-            </select>
-          </label>
+      <label>
+        Contract
+        <select
+          class="filter-input"
+          [(ngModel)]="selectedContract"
+          (change)="clearSuccessMessage(); applyFiltersAndSort()">
+          <option value="all">All</option>
+          <option value="yes">Contract Signed</option>
+          <option value="no">Contract Not Signed</option>
+        </select>
+      </label>
 
-          <label>
-            Sort By
-            <select
-              class="filter-input"
-              [(ngModel)]="selectedSort"
-              (change)="applyFiltersAndSort()">
-              <option value="lastNameAsc">Last Name A-Z</option>
-              <option value="lastNameDesc">Last Name Z-A</option>
-              <option value="firstNameAsc">First Name A-Z</option>
-              <option value="firstNameDesc">First Name Z-A</option>
-              <option value="cityAsc">City A-Z</option>
-              <option value="cityDesc">City Z-A</option>
-              <option value="stateAsc">State A-Z</option>
-              <option value="stateDesc">State Z-A</option>
-              
-            </select>
-          </label>
+      <label>
+        State
+        <select
+          class="filter-input"
+          [(ngModel)]="selectedState"
+          (change)="clearSuccessMessage(); applyFiltersAndSort()">
+          <option value="all">All States</option>
 
-        </div>
-      </div>
-    }
+          @for (state of availableStates; track state) {
+            <option [value]="state">{{ state }}</option>
+          }
+        </select>
+      </label>
+
+      <label>
+        Sort By
+        <select
+          class="filter-input"
+          [(ngModel)]="selectedSort"
+          (change)="clearSuccessMessage(); applyFiltersAndSort()">
+          <option value="lastNameAsc">Last Name A-Z</option>
+          <option value="lastNameDesc">Last Name Z-A</option>
+          <option value="firstNameAsc">First Name A-Z</option>
+          <option value="firstNameDesc">First Name Z-A</option>
+          <option value="cityAsc">City A-Z</option>
+          <option value="cityDesc">City Z-A</option>
+          <option value="stateAsc">State A-Z</option>
+          <option value="stateDesc">State Z-A</option>
+          
+        </select>
+      </label>
+
+    </div>
+  </div>
+}
+
 
   </section>
 
   <section class="table-card">
 
-    @if (!isLoading && filteredAuthors.length === 0) {
-      <div class="empty-state">
-        <h3>No authors found</h3>
-        <p>
-          Try changing your search, filters, or record status.
-        </p>
-      </div>
+
+@if (!isLoading && filteredAuthors.length === 0) {
+  <div class="empty-state">
+    <h3>No authors found</h3>
+    <p>
+      Try changing your search, filters, or record status.
+    </p>
+  </div>
+}
+
+<table class="authors-table">
+  <thead>
+    <tr>
+      <th>Author ID</th>
+      <th>First Name</th>
+      <th>Last Name</th>
+      <th>Phone</th>
+      <th>City</th>
+      <th>State</th>
+      <th>Zip</th>
+      <th>Contract</th>
+      <th>Actions</th>
+    </tr>
+  </thead>
+
+  <tbody>
+    @for (author of pagedAuthors; track author.au_id) {
+      <tr>
+        <td>{{ author.au_id }}</td>
+        <td>{{ author.au_fname | titlecase }}</td>
+        <td>{{ author.au_lname | titlecase }}</td>
+        <td>{{ author.phone }}</td>
+        <td>{{ author.city ? (author.city | titlecase) : 'N/A' }}</td>
+        <td>{{ author.state ? (author.state | uppercase) : 'N/A' }}</td>
+        <td>{{ author.zip || 'N/A' }}</td>
+        <td>
+          @if (author.contract) {
+                    <span class="contract-badge contract-signed" title="Contract signed">
+                      <mat-icon>check</mat-icon>
+                    </span>
+                  } @else {
+                    <span class="contract-badge contract-not-signed" title="Contract not signed">
+                      <mat-icon>close</mat-icon>
+                    </span>
+                  }
+        </td>
+        <td>
+          <div class="action-buttons">
+            <a class="btn btn-secondary" [routerLink]="['/authors', author.au_id]" (click)="clearSuccessMessage()">
+              View
+            </a>
+
+            
+                <!-- depending on status of the record button will cahnge wording -->
+            @if (author.is_active) {
+                  <button class="btn btn-danger" type="button" (click)="onDeleteAuthor(author.au_id)">
+                    Archive
+                  </button>
+                } @else {
+                  <button class="btn btn-outline" type="button" (click)="onUnarchiveAuthor(author.au_id)">
+                    Unarchive
+                  </button>
+                }
+          </div>
+        </td>
+      </tr>
+    } @empty {
+      <tr>
+        <td colspan="9" class="empty-row">
+          No authors match the current search or filters.
+        </td>
+      </tr>
+    }
+  </tbody>
+</table>
+
+<div class="pagination-bar">
+
+  <div class="pagination-info">
+    Showing
+    <strong>{{ getStartRecordNumber() }}</strong>
+    -
+    <strong>{{ getEndRecordNumber() }}</strong>
+    of
+    <strong>{{ filteredAuthors.length }}</strong>
+    records
+  </div>
+
+  <div class="page-size-control">
+    <label>
+      Records per page
+      <select
+        class="page-size-select"
+        [(ngModel)]="pageSize"
+        (change)="onPageSizeChange()">
+
+        @for (size of pageSizeOptions; track size) {
+        <option [ngValue]="size">{{ size }}</option>
+      }
+
+      </select>
+    </label>
+  </div>
+
+  <div class="pagination-buttons">
+
+    <button
+      class="page-btn"
+      type="button"
+      [disabled]="currentPage === 1"
+      (click)="changePage(currentPage - 1)">
+      Previous
+    </button>
+
+    @for (page of getPageNumbers(); track page) {
+      <button
+        class="page-btn"
+        type="button"
+        [class.active-page]="page === currentPage"
+        (click)="changePage(page)">
+        {{ page }}
+      </button>
     }
 
-    <table class="authors-table">
-      <thead>
-        <tr>
-          <th>Author ID</th>
-          <th>First Name</th>
-          <th>Last Name</th>
-          <th>Phone</th>
-          <th>City</th>
-          <th>State</th>
-          <th>Zip</th>
-          <th>Contract</th>
-          <th>Actions</th>
-        </tr>
-      </thead>
+    <button
+      class="page-btn"
+      type="button"
+      [disabled]="currentPage === totalPages"
+      (click)="changePage(currentPage + 1)">
+      Next
+    </button>
 
-      <tbody>
-        @for (author of pagedAuthors; track author.au_id) {
-          <tr>
-            <td>{{ author.au_id }}</td>
-            <td>{{ author.au_fname | titlecase }}</td>
-            <td>{{ author.au_lname | titlecase }}</td>
-            <td>{{ author.phone }}</td>
-            <td>{{ author.city ? (author.city | titlecase) : 'N/A' }}</td>
-            <td>{{ author.state ? (author.state | uppercase) : 'N/A' }}</td>
-            <td>{{ author.zip || 'N/A' }}</td>
-            <td>
-              @if (author.contract) {
-                        <span class="contract-badge contract-signed" title="Contract signed">
-                          <mat-icon>check</mat-icon>
-                        </span>
-                      } @else {
-                        <span class="contract-badge contract-not-signed" title="Contract not signed">
-                          <mat-icon>close</mat-icon>
-                        </span>
-                      }
-            </td>
-            <td>
-              <div class="action-buttons">
-                <a class="btn btn-secondary" [routerLink]="['/authors', author.au_id]">
-                  View
-                </a>
+  </div>
 
-                
-                    <!-- depending on status of the record button will cahnge wording -->
-                @if (author.is_active) {
-                      <button class="btn btn-danger" type="button" (click)="onDeleteAuthor(author.au_id)">
-                        Archive
-                      </button>
-                    } @else {
-                      <button class="btn btn-outline" type="button" (click)="onUnarchiveAuthor(author.au_id)">
-                        Unarchive
-                      </button>
-                    }
-              </div>
-            </td>
-          </tr>
-        } @empty {
-          <tr>
-            <td colspan="9" class="empty-row">
-              No authors match the current search or filters.
-            </td>
-          </tr>
-        }
-      </tbody>
-    </table>
+</div>
 
-    <div class="pagination-bar">
-
-      <div class="pagination-info">
-        Showing
-        <strong>{{ getStartRecordNumber() }}</strong>
-        -
-        <strong>{{ getEndRecordNumber() }}</strong>
-        of
-        <strong>{{ filteredAuthors.length }}</strong>
-        records
-      </div>
-
-      <div class="page-size-control">
-        <label>
-          Records per page
-          <select
-            class="page-size-select"
-            [(ngModel)]="pageSize"
-            (change)="onPageSizeChange()">
-
-            @for (size of pageSizeOptions; track size) {
-            <option [ngValue]="size">{{ size }}</option>
-          }
-
-          </select>
-        </label>
-      </div>
-
-      <div class="pagination-buttons">
-
-        <button
-          class="page-btn"
-          type="button"
-          [disabled]="currentPage === 1"
-          (click)="changePage(currentPage - 1)">
-          Previous
-        </button>
-
-        @for (page of getPageNumbers(); track page) {
-          <button
-            class="page-btn"
-            type="button"
-            [class.active-page]="page === currentPage"
-            (click)="changePage(page)">
-            {{ page }}
-          </button>
-        }
-
-        <button
-          class="page-btn"
-          type="button"
-          [disabled]="currentPage === totalPages"
-          (click)="changePage(currentPage + 1)">
-          Next
-        </button>
-
-      </div>
-
-    </div>
 
   </section>
 
-
-
-
-
-
   <!-- custom confirm popup, so we dont use ugly browser confirm -->
-  @if (showConfirmModal) {
-    <div class="confirm-overlay">
 
-      <div class="confirm-modal">
+@if (showConfirmModal) { <div class="confirm-overlay">
 
-        <div class="confirm-icon">
-          @if (confirmAction === 'archive') {
-            <mat-icon>archive</mat-icon>
-          } @else {
-            <mat-icon>restore</mat-icon>
-          }
-        </div>
 
-        <h2>{{ getConfirmTitle() }}</h2>
+  <div class="confirm-modal">
 
-        <p class="confirm-id">
-          Author ID:
-          <strong>{{ selectedAuthorId }}</strong>
-        </p>
-
-        <p class="confirm-message">
-          {{ getConfirmMessage() }}
-        </p>
-
-        <div class="confirm-actions">
-          <button class="btn btn-secondary" type="button" (click)="closeConfirmModal()">
-            Cancel
-          </button>
-
-          @if (confirmAction === 'archive') {
-            <button class="btn btn-danger" type="button" (click)="confirmAuthorAction()">
-              {{ getConfirmButtonText() }}
-            </button>
-          } @else {
-            <button class="btn btn-outline" type="button" (click)="confirmAuthorAction()">
-              {{ getConfirmButtonText() }}
-            </button>
-          }
-        </div>
-
-      </div>
-
+    <div class="confirm-icon">
+      @if (confirmAction === 'archive') {
+        <mat-icon>archive</mat-icon>
+      } @else {
+        <mat-icon>restore</mat-icon>
+      }
     </div>
-  }
+
+    <h2>{{ getConfirmTitle() }}</h2>
+
+    <p class="confirm-id">
+      Author ID:
+      <strong>{{ selectedAuthorId }}</strong>
+    </p>
+
+    <p class="confirm-message">
+      {{ getConfirmMessage() }}
+    </p>
+
+    <div class="confirm-actions">
+      <button class="btn btn-secondary" type="button" (click)="closeConfirmModal()">
+        Cancel
+      </button>
+
+      @if (confirmAction === 'archive') {
+        <button class="btn btn-danger" type="button" (click)="confirmAuthorAction()">
+          {{ getConfirmButtonText() }}
+        </button>
+      } @else {
+        <button class="btn btn-outline" type="button" (click)="confirmAuthorAction()">
+          {{ getConfirmButtonText() }}
+        </button>
+      }
+    </div>
+
+  </div>
+
+</div>
+
+
+}
 
 </div>

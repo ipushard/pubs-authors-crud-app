@@ -1,4 +1,5 @@
-import { Component, ChangeDetectorRef } from '@angular/core';
+import { Component, OnInit, ChangeDetectorRef } from '@angular/core';
+
 import { Router } from '@angular/router';
 import { FormsModule, NgForm } from '@angular/forms';
 
@@ -21,11 +22,12 @@ import { Author } from '../models/author';
     MatInputModule,
     MatCheckboxModule,
     MatButtonModule
+
   ],
   templateUrl: './author-create.html',
   styleUrl: './author-create.css'
 })
-export class AuthorCreate {
+export class AuthorCreate implements OnInit {
 
   newAuthor: Author = {
     au_id: '',
@@ -68,81 +70,151 @@ export class AuthorCreate {
 
 
 
+  // runs when create page opens
+ngOnInit(): void {
+this.generateUniqueAuthorId();
+}
 
-  saveAuthor(form: NgForm): void {
-    // submitted is used to show validation errors after user clicks save
-    this.submitted = true;
+// this makes random author id and checks existing id in database
+private generateUniqueAuthorId(): void {
+this.authorService.getAuthors('all').subscribe({
+next: (authors) => {
+let newId = this.createRandomAuthorId();
 
-    // clear old messages before trying to save again
-    this.errorMessage = '';
-    this.successMessage = '';
 
-    // clear old backend duplicate errors
-    this.duplicateErrors = [];
-
-    // force angular to clear old errors right away
-    this.cdr.detectChanges();
-
-    // if angular form validation fails, stop here
-    if (form.invalid) {
-      return;
+    // keep making new id untill it is not already used
+    while (authors.some(author => author.au_id === newId)) {
+      newId = this.createRandomAuthorId();
     }
 
-    // extra validation method, keeping it because you already had it
-    const validationError = this.validateAuthor();
+    this.newAuthor.au_id = newId;
+    this.cdr.detectChanges();
+  },
 
-    if (validationError) {
-      this.errorMessage = validationError;
+  error: (err) => {
+    console.error('Error loading authors for random id:', err);
+
+    // fallback id if api has small issue
+    this.newAuthor.au_id = this.createRandomAuthorId();
+    this.cdr.detectChanges();
+  }
+});
+
+
+}
+
+// this makes id in format ###-##-####
+private createRandomAuthorId(): string {
+const firstPart = Math.floor(100 + Math.random() * 900).toString();
+const secondPart = Math.floor(10 + Math.random() * 90).toString();
+const thirdPart = Math.floor(1000 + Math.random() * 9000).toString();
+
+
+return `${firstPart}-${secondPart}-${thirdPart}`;
+
+
+}
+
+
+
+
+
+
+
+
+
+
+
+
+  saveAuthor(form: NgForm): void {
+// submitted is used to show validation errors after user clicks save
+this.submitted = true;
+
+
+// clear old messages before trying to save again
+this.errorMessage = '';
+this.successMessage = '';
+
+// clear old backend duplicate errors
+this.duplicateErrors = [];
+
+// force angular to clear old errors right away
+this.cdr.detectChanges();
+
+// if angular form validation fails, stop here
+if (form.invalid) {
+  return;
+}
+
+// extra validation method, keeping it because you already had it
+const validationError = this.validateAuthor();
+
+if (validationError) {
+  this.errorMessage = validationError;
+  this.cdr.detectChanges();
+  return;
+}
+
+// send the new author to the backend api
+this.authorService.createAuthor(this.newAuthor).subscribe({
+  next: () => {
+const authorName = `${this.newAuthor.au_fname} ${this.newAuthor.au_lname}`;
+
+
+    this.router.navigate(['/authors'], {
+      queryParams: {
+        createdAuthorName: authorName,
+        createdAuthorId: this.newAuthor.au_id
+      }
+    });
+  },
+
+
+
+  error: (err) => {
+    console.error('Error creating author:', err);
+
+    // backend is not running or cannot be reached
+    if (err.status === 0) {
+      this.errorMessage = 'Cannot connect to backend API. Make sure the Node server is running.';
       this.cdr.detectChanges();
       return;
     }
 
-    // send the new author to the backend api
-    this.authorService.createAuthor(this.newAuthor).subscribe({
-      next: () => {
-        this.successMessage = 'Author created successfully.';
-
-        this.router.navigate(['/authors']);
-      },
-
-      error: (err) => {
-        console.error('Error creating author:', err);
-
-        // backend is not running or cannot be reached
-        if (err.status === 0) {
-          this.errorMessage = 'Cannot connect to backend API. Make sure the Node server is running.';
-          this.cdr.detectChanges();
-          return;
-        }
-
-        // 409 means duplicate data conflict
-        if (err.status === 409) {
-          // if backend sends multiple duplicate errors, show all of them
-          if (err.error?.errors && Array.isArray(err.error.errors)) {
-            this.duplicateErrors = err.error.errors;
-          } else {
-            this.duplicateErrors = [
-              err.error?.message || 'Duplicate author record found.'
-            ];
-          }
-
-          this.cdr.detectChanges();
-          return;
-        }
-
-        // database format error fallback
-        if (err.error?.error?.includes('CHECK constraint')) {
-          this.errorMessage = 'Invalid format. Author ID must be like 111-22-3333 and zip must be 5 digits.';
-          this.cdr.detectChanges();
-          return;
-        }
-
-        // general fallback error
-        this.errorMessage = err.error?.message || 'Could not create author. Please check the form and try again.';
-        this.cdr.detectChanges();
+    // 409 means duplicate data conflict
+    if (err.status === 409) {
+      // if backend sends multiple duplicate errors, show all of them
+      if (err.error?.errors && Array.isArray(err.error.errors)) {
+        this.duplicateErrors = err.error.errors;
+      } else {
+        this.duplicateErrors = [
+          err.error?.message || 'Duplicate author record found.'
+        ];
       }
-    });
+
+      this.cdr.detectChanges();
+      return;
+    }
+
+    // database format error fallback
+    if (err.error?.error?.includes('CHECK constraint')) {
+      this.errorMessage = 'Invalid format. Author ID must be like 111-22-3333 and zip must be 5 digits.';
+      this.cdr.detectChanges();
+      return;
+    }
+
+    // general fallback error
+    this.errorMessage = err.error?.message || 'Could not create author. Please check the form and try again.';
+    this.cdr.detectChanges();
   }
+});
+
+
+  }
+
+
+
+
 
 
 
