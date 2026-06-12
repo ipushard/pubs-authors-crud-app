@@ -142,23 +142,78 @@ Loading authors from database... </div>
         </select>
       </label>
 
-      <label>
-        Sort By
-        <select
-          class="filter-input"
-          [(ngModel)]="selectedSort"
-          (change)="clearSuccessMessage(); applyFiltersAndSort()">
-          <option value="lastNameAsc">Last Name A-Z</option>
-          <option value="lastNameDesc">Last Name Z-A</option>
-          <option value="firstNameAsc">First Name A-Z</option>
-          <option value="firstNameDesc">First Name Z-A</option>
-          <option value="cityAsc">City A-Z</option>
-          <option value="cityDesc">City Z-A</option>
-          <option value="stateAsc">State A-Z</option>
-          <option value="stateDesc">State Z-A</option>
-          
-        </select>
-      </label>
+                                    <label>
+                      Sort By
+
+                      <div class="custom-sort">
+                        <button
+                          class="filter-input custom-sort-button"
+                          type="button"
+                          (click)="toggleSortOptions()">
+                          @if (selectedSort === 'lastNameAsc') {
+                            <span>Last Name A-Z</span>
+                          } @else if (selectedSort === 'lastNameDesc') {
+                            <span>Last Name Z-A</span>
+                          } @else if (selectedSort === 'firstNameAsc') {
+                            <span>First Name A-Z</span>
+                          } @else if (selectedSort === 'firstNameDesc') {
+                            <span>First Name Z-A</span>
+                          } @else if (selectedSort === 'cityAsc') {
+                            <span>City A-Z</span>
+                          } @else if (selectedSort === 'cityDesc') {
+                            <span>City Z-A</span>
+                          } @else if (selectedSort === 'stateAsc') {
+                            <span>State A-Z</span>
+                          } @else {
+                            <span>State Z-A</span>
+                          }
+
+                    
+                      <span>▼</span>
+                    </button>
+
+                    @if (showSortOptions) {
+                      <div class="custom-sort-menu">
+
+                        <button type="button" (click)="selectSortOption('lastNameAsc')">
+                          Last Name A-Z
+                        </button>
+
+                        <button type="button" (click)="selectSortOption('lastNameDesc')">
+                          Last Name Z-A
+                        </button>
+
+                        <button type="button" (click)="selectSortOption('firstNameAsc')">
+                          First Name A-Z
+                        </button>
+
+                        <button type="button" (click)="selectSortOption('firstNameDesc')">
+                          First Name Z-A
+                        </button>
+
+                        <button type="button" (click)="selectSortOption('cityAsc')">
+                          City A-Z
+                        </button>
+
+                        <button type="button" (click)="selectSortOption('cityDesc')">
+                          City Z-A
+                        </button>
+
+                        <button type="button" (click)="selectSortOption('stateAsc')">
+                          State A-Z
+                        </button>
+
+                        <button type="button" (click)="selectSortOption('stateDesc')">
+                          State Z-A
+                        </button>
+
+                      </div>
+                    }
+                    
+
+                      </div>
+                    </label>
+
 
     </div>
   </div>

@@ -1,5 +1,5 @@
 //ChangeDetectorRef lets us manually tell Angular to refresh the HTML if needed
-import { Component, OnInit, ChangeDetectorRef } from '@angular/core';
+import { Component, OnInit, ChangeDetectorRef,HostListener } from '@angular/core';
 import { AuthorService } from '../services/author';
 import { Author } from '../models/author';
 import { RouterLink, ActivatedRoute, Router } from '@angular/router';
@@ -78,6 +78,14 @@ pageSizeOptions = [5, 10, 20, 50];
 
 totalPages = 1;
 
+// variable for drop down 
+showSortOptions = false;
+
+
+
+
+
+
 // injecting AuthorSercice and ChangeDetectorRef into the constructor
 // injecting ChangeDet here becase this allows me to force angular to refresh
 constructor(
@@ -87,10 +95,30 @@ private route: ActivatedRoute,
 private router: Router
 ) {}
 
+
+
+
 //runs automaticly when component loads and loads out tabel
 ngOnInit(): void {
 this.loadAuthors();
 }
+
+
+
+// close sort drop down when user click outside of it
+@HostListener('document:click', ['$event'])
+closeSortWhenClickOutside(event: MouseEvent): void {
+  const clickedElement = event.target as HTMLElement;
+
+  if (!clickedElement.closest('.custom-sort')) {
+    this.showSortOptions = false;
+    this.cdr.detectChanges();
+  }
+}
+
+
+
+
 
 // togle
 toggleFilters(): void {
@@ -99,11 +127,35 @@ this.showFilters = !this.showFilters;
 this.cdr.detectChanges();
 }
 
+
+
+
+
 // clear sucess message when user starts doing another action
 clearSuccessMessage(): void {
 this.successMessage = '';
 this.cdr.detectChanges();
 }
+
+
+
+// methods for drop down splitting 
+toggleSortOptions(): void {
+this.clearSuccessMessage();
+this.showSortOptions = !this.showSortOptions;
+this.cdr.detectChanges();
+}
+
+selectSortOption(sortValue: string): void {
+this.clearSuccessMessage();
+this.selectedSort = sortValue;
+this.showSortOptions = false;
+this.applyFiltersAndSort();
+}
+
+
+
+
 
 // show sucess message after creating new author
 private showCreateSuccessMessage(): void {
