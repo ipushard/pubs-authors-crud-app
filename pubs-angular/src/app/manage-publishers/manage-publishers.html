@@ -1,0 +1,340 @@
+<div class="manage-page">
+
+  <header class="page-header">
+    <div>
+      <h1>Manage Publishers</h1>
+      <p class="page-subtitle">
+        View, search, create, edit, and delete publisher records.
+      </p>
+    </div>
+
+    <button class="btn btn-primary" type="button" (click)="openCreateForm()">
+      + New Publisher
+    </button>
+  </header>
+
+  <section class="dashboard-grid">
+
+    <div class="dashboard-card">
+      <span class="dashboard-label">Total Publishers</span>
+      <strong>{{ totalPublishers }}</strong>
+      <span class="dashboard-note">publisher records</span>
+    </div>
+
+    <div class="dashboard-card">
+      <span class="dashboard-label">With City</span>
+      <strong>{{ publishersWithCity }}</strong>
+      <span class="dashboard-note">city entered</span>
+    </div>
+
+    <div class="dashboard-card">
+      <span class="dashboard-label">With State</span>
+      <strong>{{ publishersWithState }}</strong>
+      <span class="dashboard-note">state entered</span>
+    </div>
+
+    <div class="dashboard-card dashboard-card-blue">
+      <span class="dashboard-label">With Country</span>
+      <strong>{{ publishersWithCountry }}</strong>
+      <span class="dashboard-note">country entered</span>
+    </div>
+
+  </section>
+
+  @if (errorMessage) {
+    <div class="message error-message">
+      {{ errorMessage }}
+    </div>
+  }
+
+  @if (successMessage) {
+    <div class="message success-message">
+      {{ successMessage }}
+    </div>
+  }
+
+  @if (isLoading) {
+    <div class="message loading-message">
+      Loading publishers from database...
+    </div>
+  }
+
+  @if (isSaving) {
+    <div class="message loading-message">
+      Saving publisher changes...
+    </div>
+  }
+
+  @if (showPublisherForm) {
+    <section class="form-card">
+
+      <div class="form-header">
+        @if (isEditMode) {
+          <h2>Edit Publisher</h2>
+          <p>Update publisher name and location details.</p>
+        } @else {
+          <h2>Create New Publisher</h2>
+          <p>Add a new publisher record to the Pubs database.</p>
+        }
+      </div>
+
+      <div class="form-grid">
+
+        <label>
+          Publisher ID
+          <input
+            type="text"
+            class="filter-input"
+            maxlength="4"
+            placeholder="Example: 9999"
+            [disabled]="isEditMode"
+            [(ngModel)]="formPubId">
+        </label>
+
+        <label>
+          Publisher Name
+          <input
+            type="text"
+            class="filter-input"
+            maxlength="40"
+            placeholder="Example: Ontario Books"
+            [(ngModel)]="formPubName">
+        </label>
+
+        <label>
+          City
+          <input
+            type="text"
+            class="filter-input"
+            maxlength="20"
+            placeholder="Example: Toronto"
+            [(ngModel)]="formCity">
+        </label>
+
+        <label>
+          State
+          <input
+            type="text"
+            class="filter-input"
+            maxlength="2"
+            placeholder="ON"
+            [(ngModel)]="formState">
+        </label>
+
+        <label>
+          Country
+          <input
+            type="text"
+            class="filter-input"
+            maxlength="30"
+            placeholder="Canada"
+            [(ngModel)]="formCountry">
+        </label>
+
+      </div>
+
+      <div class="form-actions">
+        <button
+          class="btn btn-outline"
+          type="button"
+          [disabled]="isSaving"
+          (click)="cancelForm()">
+          Cancel
+        </button>
+
+        <button
+          class="btn btn-primary"
+          type="button"
+          [disabled]="isSaving"
+          (click)="savePublisher()">
+          @if (isEditMode) {
+            Save Changes
+          } @else {
+            Create Publisher
+          }
+        </button>
+      </div>
+
+    </section>
+  }
+
+  <section class="filter-card">
+
+    <button class="filter-toggle" type="button" (click)="toggleFilters()">
+      <span>Filter & Sort Publishers</span>
+
+      @if (showFilters) {
+        <span class="filter-arrow">▲</span>
+      } @else {
+        <span class="filter-arrow">▼</span>
+      }
+    </button>
+
+    @if (showFilters) {
+      <div class="filter-panel">
+
+        <div class="filter-header">
+          <button class="btn btn-outline" type="button" (click)="clearFilters()">
+            Clear Filters
+          </button>
+        </div>
+
+        <div class="filter-grid">
+
+          <label>
+            Search
+            <input
+              type="text"
+              class="filter-input"
+              placeholder="Search by ID, name, city, state, or country"
+              [(ngModel)]="searchTerm"
+              (input)="clearSuccessMessage(); applyFiltersAndSort()">
+          </label>
+
+          <label>
+            Sort By
+            <select
+              class="filter-input"
+              [(ngModel)]="selectedSort"
+              (change)="clearSuccessMessage(); applyFiltersAndSort()">
+              <option value="nameAsc">Publisher Name A-Z</option>
+              <option value="nameDesc">Publisher Name Z-A</option>
+              <option value="idAsc">Publisher ID A-Z</option>
+              <option value="idDesc">Publisher ID Z-A</option>
+              <option value="cityAsc">City A-Z</option>
+              <option value="cityDesc">City Z-A</option>
+              <option value="countryAsc">Country A-Z</option>
+              <option value="countryDesc">Country Z-A</option>
+            </select>
+          </label>
+
+        </div>
+      </div>
+    }
+
+  </section>
+
+  <section class="table-card">
+
+    @if (!isLoading && filteredPublishers.length === 0) {
+      <div class="empty-state">
+        <h3>No publishers found</h3>
+        <p>
+          Try changing your search or filters.
+        </p>
+      </div>
+    }
+
+    <table class="publishers-table">
+      <thead>
+        <tr>
+          <th>Publisher ID</th>
+          <th>Publisher Name</th>
+          <th>City</th>
+          <th>State</th>
+          <th>Country</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+
+      <tbody>
+        @for (publisher of pagedPublishers; track publisher.pub_id) {
+          <tr>
+            <td>{{ publisher.pub_id }}</td>
+            <td>{{ publisher.pub_name }}</td>
+            <td>{{ publisher.city || '-' }}</td>
+            <td>{{ publisher.state || '-' }}</td>
+            <td>{{ publisher.country || '-' }}</td>
+            <td>
+              <div class="action-buttons">
+                <button
+                  class="btn btn-small btn-edit"
+                  type="button"
+                  [disabled]="isSaving"
+                  (click)="openEditForm(publisher)">
+                  Edit
+                </button>
+
+                <button
+                  class="btn btn-small btn-danger"
+                  type="button"
+                  [disabled]="isSaving"
+                  (click)="deletePublisher(publisher)">
+                  Delete
+                </button>
+              </div>
+            </td>
+          </tr>
+        } @empty {
+          <tr>
+            <td colspan="6" class="empty-row">
+              No publishers match the current search or filters.
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+
+    <div class="pagination-bar">
+
+      <div class="pagination-info">
+        Showing
+        <strong>{{ getStartRecordNumber() }}</strong>
+        -
+        <strong>{{ getEndRecordNumber() }}</strong>
+        of
+        <strong>{{ filteredPublishers.length }}</strong>
+        records
+      </div>
+
+      <div class="page-size-control">
+        <label>
+          Records per page
+          <select
+            class="page-size-select"
+            [(ngModel)]="pageSize"
+            (change)="onPageSizeChange()">
+
+            @for (size of pageSizeOptions; track size) {
+              <option [ngValue]="size">{{ size }}</option>
+            }
+
+          </select>
+        </label>
+      </div>
+
+      <div class="pagination-buttons">
+
+        <button
+          class="page-btn"
+          type="button"
+          [disabled]="currentPage === 1"
+          (click)="changePage(currentPage - 1)">
+          Previous
+        </button>
+
+        @for (page of getPageNumbers(); track page) {
+          <button
+            class="page-btn"
+            type="button"
+            [class.active-page]="page === currentPage"
+            (click)="changePage(page)">
+            {{ page }}
+          </button>
+        }
+
+        <button
+          class="page-btn"
+          type="button"
+          [disabled]="currentPage === totalPages"
+          (click)="changePage(currentPage + 1)">
+          Next
+        </button>
+
+      </div>
+
+    </div>
+
+  </section>
+
+</div>

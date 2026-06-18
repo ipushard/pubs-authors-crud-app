@@ -9,6 +9,7 @@ import { RegisterInvite } from './register-invite/register-invite';
 import { ManageEmployees } from './manage-employees/manage-employees';
 import { ManageEmployeeCreate } from './manage-employee-create/manage-employee-create';
 import { ManageJobs } from './manage-jobs/manage-jobs';
+import { ManagePublishers } from './manage-publishers/manage-publishers';
 
 const managementRoles = [
   'System Administrator',
@@ -72,6 +73,11 @@ export const routes: Routes = [
   data: {
     roles: managementRoles
   }
+},
+{
+  path: 'publishers',
+  component: ManagePublishers,
+  canActivate: [authGuard]
 },
   {
     path: 'register-invite',
