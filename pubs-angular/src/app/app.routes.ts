@@ -11,6 +11,7 @@ import { ManageEmployeeCreate } from './manage-employee-create/manage-employee-c
 import { ManageJobs } from './manage-jobs/manage-jobs';
 import { ManagePublishers } from './manage-publishers/manage-publishers';
 import { ManageTitles } from './manage-titles/manage-titles';
+import { ManageSales } from './manage-sales/manage-sales';
 
 const managementRoles = [
   'System Administrator',
@@ -24,6 +25,16 @@ const managementRoles = [
   'Acquisitions Manager',
   'Productions Manager',
   'Operations Manager'
+];
+
+const salesRoles = [
+  'System Administrator',
+  'Chief Executive Officer',
+  'Chief Financial Officer',
+  'Sales Representative',
+  'Sales',
+  'Business Operations Manager',
+  'Marketing Manager'
 ];
 
 export const routes: Routes = [
@@ -84,6 +95,12 @@ export const routes: Routes = [
   path: 'titles',
   component: ManageTitles,
   canActivate: [authGuard]
+},
+{
+  path: 'sales',
+  component: ManageSales,
+  canActivate: [authGuard, roleGuard],
+  data: { roles: salesRoles }
 },
 
   {
