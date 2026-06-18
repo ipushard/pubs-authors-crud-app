@@ -1,0 +1,319 @@
+<div class="manage-page">
+
+  <header class="page-header">
+    <div>
+      <h1>Manage Jobs</h1>
+      <p class="page-subtitle">
+        View, search, create, edit, and delete job records used by employees.
+      </p>
+    </div>
+
+    <button class="btn btn-primary" type="button" (click)="openCreateForm()">
+      + New Job
+    </button>
+  </header>
+
+  <section class="dashboard-grid">
+
+    <div class="dashboard-card">
+      <span class="dashboard-label">Total Jobs</span>
+      <strong>{{ totalJobs }}</strong>
+      <span class="dashboard-note">job records</span>
+    </div>
+
+    <div class="dashboard-card">
+      <span class="dashboard-label">Lowest Min Level</span>
+      <strong>{{ lowestMinLevel }}</strong>
+      <span class="dashboard-note">minimum job level</span>
+    </div>
+
+    <div class="dashboard-card">
+      <span class="dashboard-label">Highest Max Level</span>
+      <strong>{{ highestMaxLevel }}</strong>
+      <span class="dashboard-note">maximum job level</span>
+    </div>
+
+    <div class="dashboard-card dashboard-card-blue">
+      <span class="dashboard-label">Average Range</span>
+      <strong>{{ averageLevelRange }}</strong>
+      <span class="dashboard-note">level spread</span>
+    </div>
+
+  </section>
+
+  @if (errorMessage) {
+    <div class="message error-message">
+      {{ errorMessage }}
+    </div>
+  }
+
+  @if (successMessage) {
+    <div class="message success-message">
+      {{ successMessage }}
+    </div>
+  }
+
+  @if (isLoading) {
+    <div class="message loading-message">
+      Loading jobs from database...
+    </div>
+  }
+
+  @if (isSaving) {
+    <div class="message loading-message">
+      Saving job changes...
+    </div>
+  }
+
+  @if (showJobForm) {
+    <section class="form-card">
+
+      <div class="form-header">
+        @if (isEditMode) {
+          <h2>Edit Job</h2>
+          <p>Update job description and level range.</p>
+        } @else {
+          <h2>Create New Job</h2>
+          <p>Add a new job record to the Pubs database.</p>
+        }
+      </div>
+
+      <div class="form-grid">
+
+        <label>
+          Job Description
+          <input
+            type="text"
+            class="filter-input"
+            maxlength="50"
+            placeholder="Example: Data Analyst"
+            [(ngModel)]="formJobDesc">
+        </label>
+
+        <label>
+          Minimum Level
+          <input
+            type="number"
+            class="filter-input"
+            min="1"
+            max="255"
+            [(ngModel)]="formMinLevel">
+        </label>
+
+        <label>
+          Maximum Level
+          <input
+            type="number"
+            class="filter-input"
+            min="1"
+            max="255"
+            [(ngModel)]="formMaxLevel">
+        </label>
+
+      </div>
+
+      <div class="form-actions">
+        <button
+          class="btn btn-outline"
+          type="button"
+          [disabled]="isSaving"
+          (click)="cancelForm()">
+          Cancel
+        </button>
+
+        <button
+          class="btn btn-primary"
+          type="button"
+          [disabled]="isSaving"
+          (click)="saveJob()">
+          @if (isEditMode) {
+            Save Changes
+          } @else {
+            Create Job
+          }
+        </button>
+      </div>
+
+    </section>
+  }
+
+  <section class="filter-card">
+
+    <button class="filter-toggle" type="button" (click)="toggleFilters()">
+      <span>Filter & Sort Jobs</span>
+
+      @if (showFilters) {
+        <span class="filter-arrow">▲</span>
+      } @else {
+        <span class="filter-arrow">▼</span>
+      }
+    </button>
+
+    @if (showFilters) {
+      <div class="filter-panel">
+
+        <div class="filter-header">
+          <button class="btn btn-outline" type="button" (click)="clearFilters()">
+            Clear Filters
+          </button>
+        </div>
+
+        <div class="filter-grid">
+
+          <label>
+            Search
+            <input
+              type="text"
+              class="filter-input"
+              placeholder="Search by job ID, description, min level, or max level"
+              [(ngModel)]="searchTerm"
+              (input)="clearSuccessMessage(); applyFiltersAndSort()">
+          </label>
+
+          <label>
+            Sort By
+            <select
+              class="filter-input"
+              [(ngModel)]="selectedSort"
+              (change)="clearSuccessMessage(); applyFiltersAndSort()">
+              <option value="idAsc">Job ID Low-High</option>
+              <option value="idDesc">Job ID High-Low</option>
+              <option value="descriptionAsc">Description A-Z</option>
+              <option value="descriptionDesc">Description Z-A</option>
+              <option value="minLevelAsc">Min Level Low-High</option>
+              <option value="minLevelDesc">Min Level High-Low</option>
+              <option value="maxLevelAsc">Max Level Low-High</option>
+              <option value="maxLevelDesc">Max Level High-Low</option>
+            </select>
+          </label>
+
+        </div>
+      </div>
+    }
+
+  </section>
+
+  <section class="table-card">
+
+    @if (!isLoading && filteredJobs.length === 0) {
+      <div class="empty-state">
+        <h3>No jobs found</h3>
+        <p>
+          Try changing your search or filters.
+        </p>
+      </div>
+    }
+
+    <table class="jobs-table">
+      <thead>
+        <tr>
+          <th>Job ID</th>
+          <th>Description</th>
+          <th>Minimum Level</th>
+          <th>Maximum Level</th>
+          <th>Level Range</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+
+      <tbody>
+        @for (job of pagedJobs; track job.job_id) {
+          <tr>
+            <td>{{ job.job_id }}</td>
+            <td>{{ job.job_desc }}</td>
+            <td>{{ job.min_lvl }}</td>
+            <td>{{ job.max_lvl }}</td>
+            <td>{{ job.max_lvl - job.min_lvl }}</td>
+            <td>
+              <div class="action-buttons">
+                <button
+                  class="btn btn-small btn-edit"
+                  type="button"
+                  [disabled]="isSaving"
+                  (click)="openEditForm(job)">
+                  Edit
+                </button>
+
+                <button
+                  class="btn btn-small btn-danger"
+                  type="button"
+                  [disabled]="isSaving"
+                  (click)="deleteJob(job)">
+                  Delete
+                </button>
+              </div>
+            </td>
+          </tr>
+        } @empty {
+          <tr>
+            <td colspan="6" class="empty-row">
+              No jobs match the current search or filters.
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+
+    <div class="pagination-bar">
+
+      <div class="pagination-info">
+        Showing
+        <strong>{{ getStartRecordNumber() }}</strong>
+        -
+        <strong>{{ getEndRecordNumber() }}</strong>
+        of
+        <strong>{{ filteredJobs.length }}</strong>
+        records
+      </div>
+
+      <div class="page-size-control">
+        <label>
+          Records per page
+          <select
+            class="page-size-select"
+            [(ngModel)]="pageSize"
+            (change)="onPageSizeChange()">
+
+            @for (size of pageSizeOptions; track size) {
+              <option [ngValue]="size">{{ size }}</option>
+            }
+
+          </select>
+        </label>
+      </div>
+
+      <div class="pagination-buttons">
+
+        <button
+          class="page-btn"
+          type="button"
+          [disabled]="currentPage === 1"
+          (click)="changePage(currentPage - 1)">
+          Previous
+        </button>
+
+        @for (page of getPageNumbers(); track page) {
+          <button
+            class="page-btn"
+            type="button"
+            [class.active-page]="page === currentPage"
+            (click)="changePage(page)">
+            {{ page }}
+          </button>
+        }
+
+        <button
+          class="page-btn"
+          type="button"
+          [disabled]="currentPage === totalPages"
+          (click)="changePage(currentPage + 1)">
+          Next
+        </button>
+
+      </div>
+
+    </div>
+
+  </section>
+
+</div>

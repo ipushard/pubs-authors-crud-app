@@ -8,6 +8,7 @@ import { roleGuard } from './guards/role-guard';
 import { RegisterInvite } from './register-invite/register-invite';
 import { ManageEmployees } from './manage-employees/manage-employees';
 import { ManageEmployeeCreate } from './manage-employee-create/manage-employee-create';
+import { ManageJobs } from './manage-jobs/manage-jobs';
 
 const managementRoles = [
   'System Administrator',
@@ -64,6 +65,14 @@ export const routes: Routes = [
       roles: managementRoles
     }
   },
+  {
+  path: 'jobs',
+  component: ManageJobs,
+  canActivate: [authGuard, roleGuard],
+  data: {
+    roles: managementRoles
+  }
+},
   {
     path: 'register-invite',
     component: RegisterInvite
