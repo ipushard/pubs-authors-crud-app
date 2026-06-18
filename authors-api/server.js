@@ -1251,7 +1251,19 @@ app.get('/api/admin/employees', authenticateToken, requireAdmin, async (req, res
 
 
 
-// GET PUBLISHERS FOR ADMIN EMPLOYEE FORM
+
+
+
+
+
+// PUBLISHERS MANAGEMENT ROUTES
+// these routes are used for viewing, creating, editing, and deleting publishers
+// publishers are connected to employees, titles, and publisher info
+// because of that, we do not delete publisher if other records are using it
+
+
+
+// GET PUBLISHERS FOR ADMIN EMPLOYEE FORM AND PUBLISHERS MANAGEMENT PAGE
 app.get('/api/admin/publishers', authenticateToken, requireAdmin, async (req, res) => {
     try {
         const pool = await sql.connect(dbConfig);
@@ -1273,6 +1285,375 @@ app.get('/api/admin/publishers', authenticateToken, requireAdmin, async (req, re
 
         res.status(500).json({
             message: 'Error getting publishers.',
+            error: err.message
+        });
+    }
+});
+
+
+
+// CREATE NEW PUBLISHER
+app.post('/api/admin/publishers', authenticateToken, requireAdmin, async (req, res) => {
+    try {
+        const {
+            pub_id,
+            pub_name,
+            city,
+            state,
+            country
+        } = req.body;
+
+        if (!pub_id || !pub_name) {
+            return res.status(400).json({
+                message: 'Publisher ID and publisher name are required.'
+            });
+        }
+
+        const cleanPubId = pub_id.trim();
+        const cleanPubName = pub_name.trim();
+        const cleanCity = city ? city.trim() : null;
+        const cleanState = state ? state.trim().toUpperCase() : null;
+        const cleanCountry = country ? country.trim() : null;
+
+        if (cleanPubId.length !== 4) {
+            return res.status(400).json({
+                message: 'Publisher ID must be exactly 4 characters.'
+            });
+        }
+
+        if (!cleanPubName) {
+            return res.status(400).json({
+                message: 'Publisher name is required.'
+            });
+        }
+
+        if (cleanPubName.length > 40) {
+            return res.status(400).json({
+                message: 'Publisher name cannot be longer than 40 characters.'
+            });
+        }
+
+        if (cleanCity && cleanCity.length > 20) {
+            return res.status(400).json({
+                message: 'City cannot be longer than 20 characters.'
+            });
+        }
+
+        if (cleanState && cleanState.length > 2) {
+            return res.status(400).json({
+                message: 'State must be 2 characters or less.'
+            });
+        }
+
+        if (cleanCountry && cleanCountry.length > 30) {
+            return res.status(400).json({
+                message: 'Country cannot be longer than 30 characters.'
+            });
+        }
+
+        const pool = await sql.connect(dbConfig);
+
+        // check if publisher ID already exists
+        const idCheck = await pool.request()
+            .input('pub_id', sql.Char(4), cleanPubId)
+            .query(`
+                SELECT pub_id
+                FROM publishers
+                WHERE pub_id = @pub_id
+            `);
+
+        if (idCheck.recordset.length > 0) {
+            return res.status(409).json({
+                message: 'Publisher ID already exists.'
+            });
+        }
+
+        // check if publisher name already exists
+        const nameCheck = await pool.request()
+            .input('pub_name', sql.VarChar(40), cleanPubName)
+            .query(`
+                SELECT pub_id
+                FROM publishers
+                WHERE LOWER(LTRIM(RTRIM(pub_name))) = LOWER(LTRIM(RTRIM(@pub_name)))
+            `);
+
+        if (nameCheck.recordset.length > 0) {
+            return res.status(409).json({
+                message: 'A publisher with this name already exists.'
+            });
+        }
+
+        const result = await pool.request()
+            .input('pub_id', sql.Char(4), cleanPubId)
+            .input('pub_name', sql.VarChar(40), cleanPubName)
+            .input('city', sql.VarChar(20), cleanCity)
+            .input('state', sql.Char(2), cleanState)
+            .input('country', sql.VarChar(30), cleanCountry)
+            .query(`
+                INSERT INTO publishers
+                    (
+                        pub_id,
+                        pub_name,
+                        city,
+                        state,
+                        country
+                    )
+                OUTPUT
+                    INSERTED.pub_id,
+                    INSERTED.pub_name,
+                    INSERTED.city,
+                    INSERTED.state,
+                    INSERTED.country
+                VALUES
+                    (
+                        @pub_id,
+                        @pub_name,
+                        @city,
+                        @state,
+                        @country
+                    )
+            `);
+
+        res.status(201).json({
+            message: 'Publisher created successfully.',
+            publisher: result.recordset[0]
+        });
+
+    } catch (err) {
+        console.error('Create publisher error:', err);
+
+        res.status(500).json({
+            message: 'Error creating publisher.',
+            error: err.message
+        });
+    }
+});
+
+
+
+// UPDATE EXISTING PUBLISHER
+app.put('/api/admin/publishers/:pub_id', authenticateToken, requireAdmin, async (req, res) => {
+    try {
+        const pubId = req.params.pub_id;
+
+        const {
+            pub_name,
+            city,
+            state,
+            country
+        } = req.body;
+
+        if (!pubId || !pub_name) {
+            return res.status(400).json({
+                message: 'Publisher ID and publisher name are required.'
+            });
+        }
+
+        const cleanPubId = pubId.trim();
+        const cleanPubName = pub_name.trim();
+        const cleanCity = city ? city.trim() : null;
+        const cleanState = state ? state.trim().toUpperCase() : null;
+        const cleanCountry = country ? country.trim() : null;
+
+        if (cleanPubId.length !== 4) {
+            return res.status(400).json({
+                message: 'Publisher ID must be exactly 4 characters.'
+            });
+        }
+
+        if (!cleanPubName) {
+            return res.status(400).json({
+                message: 'Publisher name is required.'
+            });
+        }
+
+        if (cleanPubName.length > 40) {
+            return res.status(400).json({
+                message: 'Publisher name cannot be longer than 40 characters.'
+            });
+        }
+
+        if (cleanCity && cleanCity.length > 20) {
+            return res.status(400).json({
+                message: 'City cannot be longer than 20 characters.'
+            });
+        }
+
+        if (cleanState && cleanState.length > 2) {
+            return res.status(400).json({
+                message: 'State must be 2 characters or less.'
+            });
+        }
+
+        if (cleanCountry && cleanCountry.length > 30) {
+            return res.status(400).json({
+                message: 'Country cannot be longer than 30 characters.'
+            });
+        }
+
+        const pool = await sql.connect(dbConfig);
+
+        // check if publisher exists
+        const publisherCheck = await pool.request()
+            .input('pub_id', sql.Char(4), cleanPubId)
+            .query(`
+                SELECT pub_id
+                FROM publishers
+                WHERE pub_id = @pub_id
+            `);
+
+        if (publisherCheck.recordset.length === 0) {
+            return res.status(404).json({
+                message: 'Publisher not found.'
+            });
+        }
+
+        // check duplicate publisher name but ignore current publisher
+        const duplicateCheck = await pool.request()
+            .input('pub_id', sql.Char(4), cleanPubId)
+            .input('pub_name', sql.VarChar(40), cleanPubName)
+            .query(`
+                SELECT pub_id
+                FROM publishers
+                WHERE LOWER(LTRIM(RTRIM(pub_name))) = LOWER(LTRIM(RTRIM(@pub_name)))
+                AND pub_id <> @pub_id
+            `);
+
+        if (duplicateCheck.recordset.length > 0) {
+            return res.status(409).json({
+                message: 'Another publisher with this name already exists.'
+            });
+        }
+
+        await pool.request()
+            .input('pub_id', sql.Char(4), cleanPubId)
+            .input('pub_name', sql.VarChar(40), cleanPubName)
+            .input('city', sql.VarChar(20), cleanCity)
+            .input('state', sql.Char(2), cleanState)
+            .input('country', sql.VarChar(30), cleanCountry)
+            .query(`
+                UPDATE publishers
+                SET
+                    pub_name = @pub_name,
+                    city = @city,
+                    state = @state,
+                    country = @country
+                WHERE pub_id = @pub_id
+            `);
+
+        res.json({
+            message: 'Publisher updated successfully.'
+        });
+
+    } catch (err) {
+        console.error('Update publisher error:', err);
+
+        res.status(500).json({
+            message: 'Error updating publisher.',
+            error: err.message
+        });
+    }
+});
+
+
+
+// DELETE PUBLISHER
+app.delete('/api/admin/publishers/:pub_id', authenticateToken, requireAdmin, async (req, res) => {
+    try {
+        const pubId = req.params.pub_id;
+
+        if (!pubId || pubId.trim().length !== 4) {
+            return res.status(400).json({
+                message: 'Valid publisher ID is required.'
+            });
+        }
+
+        const cleanPubId = pubId.trim();
+
+        const pool = await sql.connect(dbConfig);
+
+        // check if publisher exists
+        const publisherCheck = await pool.request()
+            .input('pub_id', sql.Char(4), cleanPubId)
+            .query(`
+                SELECT pub_id, pub_name
+                FROM publishers
+                WHERE pub_id = @pub_id
+            `);
+
+        if (publisherCheck.recordset.length === 0) {
+            return res.status(404).json({
+                message: 'Publisher not found.'
+            });
+        }
+
+        // check if employees are using this publisher
+        const employeeCheck = await pool.request()
+            .input('pub_id', sql.Char(4), cleanPubId)
+            .query(`
+                SELECT COUNT(*) AS employeeCount
+                FROM employee
+                WHERE pub_id = @pub_id
+            `);
+
+        const employeeCount = employeeCheck.recordset[0].employeeCount;
+
+        if (employeeCount > 0) {
+            return res.status(400).json({
+                message: `This publisher cannot be deleted because ${employeeCount} employee record(s) are assigned to it. Reassign those employees first.`
+            });
+        }
+
+        // check if titles are using this publisher
+        const titleCheck = await pool.request()
+            .input('pub_id', sql.Char(4), cleanPubId)
+            .query(`
+                SELECT COUNT(*) AS titleCount
+                FROM titles
+                WHERE pub_id = @pub_id
+            `);
+
+        const titleCount = titleCheck.recordset[0].titleCount;
+
+        if (titleCount > 0) {
+            return res.status(400).json({
+                message: `This publisher cannot be deleted because ${titleCount} title record(s) are assigned to it. Reassign those titles first.`
+            });
+        }
+
+        // check if publisher info is using this publisher
+        const publisherInfoCheck = await pool.request()
+            .input('pub_id', sql.Char(4), cleanPubId)
+            .query(`
+                SELECT COUNT(*) AS publisherInfoCount
+                FROM pub_info
+                WHERE pub_id = @pub_id
+            `);
+
+        const publisherInfoCount = publisherInfoCheck.recordset[0].publisherInfoCount;
+
+        if (publisherInfoCount > 0) {
+            return res.status(400).json({
+                message: 'This publisher cannot be deleted because publisher information is connected to it. Delete or update the publisher info first.'
+            });
+        }
+
+        await pool.request()
+            .input('pub_id', sql.Char(4), cleanPubId)
+            .query(`
+                DELETE FROM publishers
+                WHERE pub_id = @pub_id
+            `);
+
+        res.json({
+            message: 'Publisher deleted successfully.'
+        });
+
+    } catch (err) {
+        console.error('Delete publisher error:', err);
+
+        res.status(500).json({
+            message: 'Error deleting publisher.',
             error: err.message
         });
     }
