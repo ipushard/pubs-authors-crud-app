@@ -920,35 +920,332 @@ app.get('/api/admin/employees', authenticateToken, requireAdmin, async (req, res
 
 
 
-// GET JOBS FOR ADMIN EMPLOYEE FORM helper
-app.get('/api/admin/jobs', authenticateToken, requireAdmin, async (req, res) => {
-    try {
-        const pool = await sql.connect(dbConfig);
-
-        const result = await pool.request().query(`
-            SELECT
-                job_id,
-                job_desc,
-                min_lvl,
-                max_lvl
-            FROM jobs
-            ORDER BY job_id
-        `);
-
-        res.json(result.recordset);
-    } catch (err) {
-        console.error('Get jobs error:', err);
-
-        res.status(500).json({
-            message: 'Error getting jobs.',
-            error: err.message
-        });
-    }
-});
+                                    // JOBS MANAGEMENT ROUTES
+                                    // these routes are used for viewing, creating, editing, and deleting jobs
+                                    // jobs are connected to employees, so we do not delete a job if employees are assigned to it
 
 
 
+                                    // GET JOBS FOR ADMIN EMPLOYEE FORM AND JOBS MANAGEMENT PAGE
+                                    app.get('/api/admin/jobs', authenticateToken, requireAdmin, async (req, res) => {
+                                        try {
+                                            const pool = await sql.connect(dbConfig);
 
+                                            const result = await pool.request().query(`
+                                                SELECT
+                                                    job_id,
+                                                    job_desc,
+                                                    min_lvl,
+                                                    max_lvl
+                                                FROM jobs
+                                                ORDER BY job_id
+                                            `);
+
+                                            res.json(result.recordset);
+                                        } catch (err) {
+                                            console.error('Get jobs error:', err);
+
+                                            res.status(500).json({
+                                                message: 'Error getting jobs.',
+                                                error: err.message
+                                            });
+                                        }
+                                    });
+
+
+
+                                    // CREATE NEW JOB
+                                    app.post('/api/admin/jobs', authenticateToken, requireAdmin, async (req, res) => {
+                                        try {
+                                            const {
+                                                job_desc,
+                                                min_lvl,
+                                                max_lvl
+                                            } = req.body;
+
+                                            if (!job_desc || min_lvl === null || min_lvl === undefined || max_lvl === null || max_lvl === undefined) {
+                                                return res.status(400).json({
+                                                    message: 'Job description, minimum level, and maximum level are required.'
+                                                });
+                                            }
+
+                                            const cleanJobDesc = job_desc.trim();
+
+                                            const parsedMinLevel = Number(min_lvl);
+                                            const parsedMaxLevel = Number(max_lvl);
+
+                                            if (!cleanJobDesc) {
+                                                return res.status(400).json({
+                                                    message: 'Job description is required.'
+                                                });
+                                            }
+
+                                            if (!Number.isInteger(parsedMinLevel) || !Number.isInteger(parsedMaxLevel)) {
+                                                return res.status(400).json({
+                                                    message: 'Minimum level and maximum level must be whole numbers.'
+                                                });
+                                            }
+
+                                            if (parsedMinLevel < 1 || parsedMinLevel > 255 || parsedMaxLevel < 1 || parsedMaxLevel > 255) {
+                                                return res.status(400).json({
+                                                    message: 'Job levels must be between 1 and 255.'
+                                                });
+                                            }
+
+                                            if (parsedMinLevel > parsedMaxLevel) {
+                                                return res.status(400).json({
+                                                    message: 'Minimum level cannot be greater than maximum level.'
+                                                });
+                                            }
+
+                                            const pool = await sql.connect(dbConfig);
+
+                                            // check if job description already exists
+                                            const duplicateCheck = await pool.request()
+                                                .input('job_desc', sql.VarChar(50), cleanJobDesc)
+                                                .query(`
+                                                    SELECT job_id
+                                                    FROM jobs
+                                                    WHERE LOWER(LTRIM(RTRIM(job_desc))) = LOWER(LTRIM(RTRIM(@job_desc)))
+                                                `);
+
+                                            if (duplicateCheck.recordset.length > 0) {
+                                                return res.status(409).json({
+                                                    message: 'A job with this description already exists.'
+                                                });
+                                            }
+
+                                            const result = await pool.request()
+                                                .input('job_desc', sql.VarChar(50), cleanJobDesc)
+                                                .input('min_lvl', sql.TinyInt, parsedMinLevel)
+                                                .input('max_lvl', sql.TinyInt, parsedMaxLevel)
+                                                .query(`
+                                                    INSERT INTO jobs
+                                                        (
+                                                            job_desc,
+                                                            min_lvl,
+                                                            max_lvl
+                                                        )
+                                                    OUTPUT
+                                                        INSERTED.job_id,
+                                                        INSERTED.job_desc,
+                                                        INSERTED.min_lvl,
+                                                        INSERTED.max_lvl
+                                                    VALUES
+                                                        (
+                                                            @job_desc,
+                                                            @min_lvl,
+                                                            @max_lvl
+                                                        )
+                                                `);
+
+                                            res.status(201).json({
+                                                message: 'Job created successfully.',
+                                                job: result.recordset[0]
+                                            });
+
+                                        } catch (err) {
+                                            console.error('Create job error:', err);
+
+                                            res.status(500).json({
+                                                message: 'Error creating job.',
+                                                error: err.message
+                                            });
+                                        }
+                                    });
+
+
+
+                                    // UPDATE EXISTING JOB
+                                    app.put('/api/admin/jobs/:job_id', authenticateToken, requireAdmin, async (req, res) => {
+                                        try {
+                                            const jobId = Number(req.params.job_id);
+
+                                            const {
+                                                job_desc,
+                                                min_lvl,
+                                                max_lvl
+                                            } = req.body;
+
+                                            if (!Number.isInteger(jobId)) {
+                                                return res.status(400).json({
+                                                    message: 'Valid job ID is required.'
+                                                });
+                                            }
+
+                                            if (!job_desc || min_lvl === null || min_lvl === undefined || max_lvl === null || max_lvl === undefined) {
+                                                return res.status(400).json({
+                                                    message: 'Job description, minimum level, and maximum level are required.'
+                                                });
+                                            }
+
+                                            const cleanJobDesc = job_desc.trim();
+
+                                            const parsedMinLevel = Number(min_lvl);
+                                            const parsedMaxLevel = Number(max_lvl);
+
+                                            if (!cleanJobDesc) {
+                                                return res.status(400).json({
+                                                    message: 'Job description is required.'
+                                                });
+                                            }
+
+                                            if (!Number.isInteger(parsedMinLevel) || !Number.isInteger(parsedMaxLevel)) {
+                                                return res.status(400).json({
+                                                    message: 'Minimum level and maximum level must be whole numbers.'
+                                                });
+                                            }
+
+                                            if (parsedMinLevel < 1 || parsedMinLevel > 255 || parsedMaxLevel < 1 || parsedMaxLevel > 255) {
+                                                return res.status(400).json({
+                                                    message: 'Job levels must be between 1 and 255.'
+                                                });
+                                            }
+
+                                            if (parsedMinLevel > parsedMaxLevel) {
+                                                return res.status(400).json({
+                                                    message: 'Minimum level cannot be greater than maximum level.'
+                                                });
+                                            }
+
+                                            const pool = await sql.connect(dbConfig);
+
+                                            // check if job exists
+                                            const jobCheck = await pool.request()
+                                                .input('job_id', sql.SmallInt, jobId)
+                                                .query(`
+                                                    SELECT job_id
+                                                    FROM jobs
+                                                    WHERE job_id = @job_id
+                                                `);
+
+                                            if (jobCheck.recordset.length === 0) {
+                                                return res.status(404).json({
+                                                    message: 'Job not found.'
+                                                });
+                                            }
+
+                                            // check duplicate description but ignore the current job
+                                            const duplicateCheck = await pool.request()
+                                                .input('job_id', sql.SmallInt, jobId)
+                                                .input('job_desc', sql.VarChar(50), cleanJobDesc)
+                                                .query(`
+                                                    SELECT job_id
+                                                    FROM jobs
+                                                    WHERE LOWER(LTRIM(RTRIM(job_desc))) = LOWER(LTRIM(RTRIM(@job_desc)))
+                                                    AND job_id <> @job_id
+                                                `);
+
+                                            if (duplicateCheck.recordset.length > 0) {
+                                                return res.status(409).json({
+                                                    message: 'Another job with this description already exists.'
+                                                });
+                                            }
+
+                                            await pool.request()
+                                                .input('job_id', sql.SmallInt, jobId)
+                                                .input('job_desc', sql.VarChar(50), cleanJobDesc)
+                                                .input('min_lvl', sql.TinyInt, parsedMinLevel)
+                                                .input('max_lvl', sql.TinyInt, parsedMaxLevel)
+                                                .query(`
+                                                    UPDATE jobs
+                                                    SET
+                                                        job_desc = @job_desc,
+                                                        min_lvl = @min_lvl,
+                                                        max_lvl = @max_lvl
+                                                    WHERE job_id = @job_id
+                                                `);
+
+                                            res.json({
+                                                message: 'Job updated successfully.'
+                                            });
+
+                                        } catch (err) {
+                                            console.error('Update job error:', err);
+
+                                            res.status(500).json({
+                                                message: 'Error updating job.',
+                                                error: err.message
+                                            });
+                                        }
+                                    });
+
+
+
+                                    // DELETE JOB
+                                    app.delete('/api/admin/jobs/:job_id', authenticateToken, requireAdmin, async (req, res) => {
+                                        try {
+                                            const jobId = Number(req.params.job_id);
+
+                                            if (!Number.isInteger(jobId)) {
+                                                return res.status(400).json({
+                                                    message: 'Valid job ID is required.'
+                                                });
+                                            }
+
+                                            const pool = await sql.connect(dbConfig);
+
+                                            // check if job exists
+                                            const jobCheck = await pool.request()
+                                                .input('job_id', sql.SmallInt, jobId)
+                                                .query(`
+                                                    SELECT job_id, job_desc
+                                                    FROM jobs
+                                                    WHERE job_id = @job_id
+                                                `);
+
+                                            if (jobCheck.recordset.length === 0) {
+                                                return res.status(404).json({
+                                                    message: 'Job not found.'
+                                                });
+                                            }
+
+                                            // check if employees are using this job
+                                            const employeeCheck = await pool.request()
+                                                .input('job_id', sql.SmallInt, jobId)
+                                                .query(`
+                                                    SELECT COUNT(*) AS employeeCount
+                                                    FROM employee
+                                                    WHERE job_id = @job_id
+                                                `);
+
+                                            const employeeCount = employeeCheck.recordset[0].employeeCount;
+
+                                            if (employeeCount > 0) {
+                                                return res.status(400).json({
+                                                    message: `This job cannot be deleted because ${employeeCount} employee record(s) are assigned to it. Reassign those employees first.`
+                                                });
+                                            }
+
+                                            await pool.request()
+                                                .input('job_id', sql.SmallInt, jobId)
+                                                .query(`
+                                                    DELETE FROM jobs
+                                                    WHERE job_id = @job_id
+                                                `);
+
+                                            res.json({
+                                                message: 'Job deleted successfully.'
+                                            });
+
+                                        } catch (err) {
+                                            console.error('Delete job error:', err);
+
+                                            res.status(500).json({
+                                                message: 'Error deleting job.',
+                                                error: err.message
+                                            });
+                                        }
+                                    });
+
+
+
+
+
+
+
+
+                                    //<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
 
 
