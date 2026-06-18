@@ -1,0 +1,454 @@
+<div class="manage-page">
+
+  <header class="page-header">
+    <div>
+      <h1>Manage Titles</h1>
+      <p class="page-subtitle">
+        View, search, create, edit, and delete book title records.
+      </p>
+    </div>
+
+    <button class="btn btn-primary" type="button" (click)="openCreateForm()">
+      + New Title
+    </button>
+  </header>
+
+  <section class="dashboard-grid">
+
+    <div class="dashboard-card">
+      <span class="dashboard-label">Total Titles</span>
+      <strong>{{ totalTitles }}</strong>
+      <span class="dashboard-note">title records</span>
+    </div>
+
+    <div class="dashboard-card">
+      <span class="dashboard-label">With Price</span>
+      <strong>{{ titlesWithPrice }}</strong>
+      <span class="dashboard-note">priced titles</span>
+    </div>
+
+    <div class="dashboard-card">
+      <span class="dashboard-label">YTD Sales</span>
+      <strong>{{ totalYtdSales }}</strong>
+      <span class="dashboard-note">total sales count</span>
+    </div>
+
+    <div class="dashboard-card dashboard-card-blue">
+      <span class="dashboard-label">Average Price</span>
+      <strong>${{ averagePrice }}</strong>
+      <span class="dashboard-note">priced titles only</span>
+    </div>
+
+  </section>
+
+  @if (errorMessage) {
+    <div class="message error-message">
+      {{ errorMessage }}
+    </div>
+  }
+
+  @if (successMessage) {
+    <div class="message success-message">
+      {{ successMessage }}
+    </div>
+  }
+
+  @if (isLoading) {
+    <div class="message loading-message">
+      Loading titles from database...
+    </div>
+  }
+
+  @if (isSaving) {
+    <div class="message loading-message">
+      Saving title changes...
+    </div>
+  }
+
+  @if (showTitleForm) {
+    <section class="form-card">
+
+      <div class="form-header">
+        @if (isEditMode) {
+          <h2>Edit Title</h2>
+          <p>Update title information, publisher, pricing, royalty, and publication date.</p>
+        } @else {
+          <h2>Create New Title</h2>
+          <p>Add a new title record to the Pubs database.</p>
+        }
+      </div>
+
+      <div class="form-grid">
+
+        <label>
+          Title ID
+          <input
+            type="text"
+            class="filter-input"
+            maxlength="6"
+            placeholder="Example: BU9999"
+            [disabled]="isEditMode"
+            [(ngModel)]="formTitleId">
+        </label>
+
+        <label>
+          Title Name
+          <input
+            type="text"
+            class="filter-input"
+            maxlength="80"
+            placeholder="Example: Learning SQL"
+            [(ngModel)]="formTitle">
+        </label>
+
+        <label>
+          Type
+          <input
+            type="text"
+            class="filter-input"
+            maxlength="12"
+            placeholder="business"
+            [(ngModel)]="formType">
+        </label>
+
+        <label>
+          Publisher
+          <select
+            class="filter-input"
+            [(ngModel)]="formPubId">
+
+            <option value="">Select Publisher</option>
+
+            @for (publisher of publishers; track publisher.pub_id) {
+              <option [value]="publisher.pub_id">
+                {{ publisher.pub_name }} ({{ publisher.pub_id }})
+              </option>
+            }
+
+          </select>
+        </label>
+
+        <label>
+          Price
+          <input
+            type="number"
+            class="filter-input"
+            min="0"
+            step="0.01"
+            placeholder="19.99"
+            [(ngModel)]="formPrice">
+        </label>
+
+        <label>
+          Advance
+          <input
+            type="number"
+            class="filter-input"
+            min="0"
+            step="0.01"
+            placeholder="5000"
+            [(ngModel)]="formAdvance">
+        </label>
+
+        <label>
+          Royalty
+          <input
+            type="number"
+            class="filter-input"
+            min="0"
+            max="100"
+            step="1"
+            placeholder="10"
+            [(ngModel)]="formRoyalty">
+        </label>
+
+        <label>
+          YTD Sales
+          <input
+            type="number"
+            class="filter-input"
+            min="0"
+            step="1"
+            placeholder="0"
+            [(ngModel)]="formYtdSales">
+        </label>
+
+        <label>
+          Publication Date
+          <input
+            type="date"
+            class="filter-input"
+            [(ngModel)]="formPubDate">
+        </label>
+
+      </div>
+
+      <label class="notes-label">
+        Notes
+        <textarea
+          class="filter-input notes-input"
+          maxlength="200"
+          placeholder="Optional notes about this title"
+          [(ngModel)]="formNotes">
+        </textarea>
+      </label>
+
+      <div class="form-actions">
+        <button
+          class="btn btn-outline"
+          type="button"
+          [disabled]="isSaving"
+          (click)="cancelForm()">
+          Cancel
+        </button>
+
+        <button
+          class="btn btn-primary"
+          type="button"
+          [disabled]="isSaving"
+          (click)="saveTitle()">
+          @if (isEditMode) {
+            Save Changes
+          } @else {
+            Create Title
+          }
+        </button>
+      </div>
+
+    </section>
+  }
+
+  <section class="filter-card">
+
+    <button class="filter-toggle" type="button" (click)="toggleFilters()">
+      <span>Filter & Sort Titles</span>
+
+      @if (showFilters) {
+        <span class="filter-arrow">▲</span>
+      } @else {
+        <span class="filter-arrow">▼</span>
+      }
+    </button>
+
+    @if (showFilters) {
+      <div class="filter-panel">
+
+        <div class="filter-header">
+          <button class="btn btn-outline" type="button" (click)="clearFilters()">
+            Clear Filters
+          </button>
+        </div>
+
+        <div class="filter-grid">
+
+          <label>
+            Search
+            <input
+              type="text"
+              class="filter-input"
+              placeholder="Search by title ID, name, type, publisher, price, royalty, or sales"
+              [(ngModel)]="searchTerm"
+              (input)="clearSuccessMessage(); applyFiltersAndSort()">
+          </label>
+
+          <label>
+            Type
+            <select
+              class="filter-input"
+              [(ngModel)]="selectedType"
+              (change)="clearSuccessMessage(); applyFiltersAndSort()">
+              <option value="all">All Types</option>
+
+              @for (type of availableTypes; track type) {
+                <option [value]="type">{{ type }}</option>
+              }
+            </select>
+          </label>
+
+          <label>
+            Publisher
+            <select
+              class="filter-input"
+              [(ngModel)]="selectedPublisher"
+              (change)="clearSuccessMessage(); applyFiltersAndSort()">
+              <option value="all">All Publishers</option>
+
+              @for (publisher of publishers; track publisher.pub_id) {
+                <option [value]="publisher.pub_id">
+                  {{ publisher.pub_name }}
+                </option>
+              }
+            </select>
+          </label>
+
+          <label>
+            Sort By
+            <select
+              class="filter-input"
+              [(ngModel)]="selectedSort"
+              (change)="clearSuccessMessage(); applyFiltersAndSort()">
+              <option value="titleAsc">Title A-Z</option>
+              <option value="titleDesc">Title Z-A</option>
+              <option value="idAsc">Title ID A-Z</option>
+              <option value="idDesc">Title ID Z-A</option>
+              <option value="typeAsc">Type A-Z</option>
+              <option value="typeDesc">Type Z-A</option>
+              <option value="publisherAsc">Publisher A-Z</option>
+              <option value="publisherDesc">Publisher Z-A</option>
+              <option value="priceHigh">Price High-Low</option>
+              <option value="priceLow">Price Low-High</option>
+              <option value="salesHigh">Sales High-Low</option>
+              <option value="salesLow">Sales Low-High</option>
+              <option value="dateNewest">Publication Date Newest</option>
+              <option value="dateOldest">Publication Date Oldest</option>
+            </select>
+          </label>
+
+        </div>
+      </div>
+    }
+
+  </section>
+
+  <section class="table-card">
+
+    @if (!isLoading && filteredTitles.length === 0) {
+      <div class="empty-state">
+        <h3>No titles found</h3>
+        <p>
+          Try changing your search, type, publisher, or sort option.
+        </p>
+      </div>
+    }
+
+    <table class="titles-table">
+      <thead>
+        <tr>
+          <th>Title ID</th>
+          <th>Title</th>
+          <th>Type</th>
+          <th>Publisher</th>
+          <th>Price</th>
+          <th>Royalty</th>
+          <th>YTD Sales</th>
+          <th>Pub Date</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+
+      <tbody>
+        @for (title of pagedTitles; track title.title_id) {
+          <tr>
+            <td>{{ title.title_id }}</td>
+            <td>{{ title.title }}</td>
+            <td>{{ title.type }}</td>
+            <td>{{ title.pub_name || title.pub_id }}</td>
+            <td>
+              @if (title.price !== null) {
+                ${{ title.price }}
+              } @else {
+                -
+              }
+            </td>
+            <td>
+              @if (title.royalty !== null) {
+                {{ title.royalty }}%
+              } @else {
+                -
+              }
+            </td>
+            <td>{{ title.ytd_sales ?? 0 }}</td>
+            <td>{{ title.pubdate | date:'mediumDate' }}</td>
+            <td>
+              <div class="action-buttons">
+                <button
+                  class="btn btn-small btn-edit"
+                  type="button"
+                  [disabled]="isSaving"
+                  (click)="openEditForm(title)">
+                  Edit
+                </button>
+
+                <button
+                  class="btn btn-small btn-danger"
+                  type="button"
+                  [disabled]="isSaving"
+                  (click)="deleteTitle(title)">
+                  Delete
+                </button>
+              </div>
+            </td>
+          </tr>
+        } @empty {
+          <tr>
+            <td colspan="9" class="empty-row">
+              No titles match the current search or filters.
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+
+    <div class="pagination-bar">
+
+      <div class="pagination-info">
+        Showing
+        <strong>{{ getStartRecordNumber() }}</strong>
+        -
+        <strong>{{ getEndRecordNumber() }}</strong>
+        of
+        <strong>{{ filteredTitles.length }}</strong>
+        records
+      </div>
+
+      <div class="page-size-control">
+        <label>
+          Records per page
+          <select
+            class="page-size-select"
+            [(ngModel)]="pageSize"
+            (change)="onPageSizeChange()">
+
+            @for (size of pageSizeOptions; track size) {
+              <option [ngValue]="size">{{ size }}</option>
+            }
+
+          </select>
+        </label>
+      </div>
+
+      <div class="pagination-buttons">
+
+        <button
+          class="page-btn"
+          type="button"
+          [disabled]="currentPage === 1"
+          (click)="changePage(currentPage - 1)">
+          Previous
+        </button>
+
+        @for (page of getPageNumbers(); track page) {
+          <button
+            class="page-btn"
+            type="button"
+            [class.active-page]="page === currentPage"
+            (click)="changePage(page)">
+            {{ page }}
+          </button>
+        }
+
+        <button
+          class="page-btn"
+          type="button"
+          [disabled]="currentPage === totalPages"
+          (click)="changePage(currentPage + 1)">
+          Next
+        </button>
+
+      </div>
+
+    </div>
+
+  </section>
+
+</div>
