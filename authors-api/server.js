@@ -1664,6 +1664,577 @@ app.delete('/api/admin/publishers/:pub_id', authenticateToken, requireAdmin, asy
 
 
 
+//>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
+
+// TITLES MANAGEMENT ROUTES
+// these routes are used for viewing, creating, editing, and deleting titles
+// titles are connected to publishers, sales, title authors, and royalty schedules
+// because of that, we do not delete a title if other records are using it
+
+
+
+// GET TITLES FOR TITLES MANAGEMENT PAGE
+app.get('/api/admin/titles', authenticateToken, requireAdmin, async (req, res) => {
+    try {
+        const pool = await sql.connect(dbConfig);
+
+        const result = await pool.request().query(`
+            SELECT
+                t.title_id,
+                t.title,
+                t.type,
+                t.pub_id,
+                t.price,
+                t.advance,
+                t.royalty,
+                t.ytd_sales,
+                t.notes,
+                t.pubdate,
+
+                p.pub_name
+            FROM titles t
+            LEFT JOIN publishers p ON t.pub_id = p.pub_id
+            ORDER BY t.title
+        `);
+
+        res.json(result.recordset);
+    } catch (err) {
+        console.error('Get titles error:', err);
+
+        res.status(500).json({
+            message: 'Error getting titles.',
+            error: err.message
+        });
+    }
+});
+
+
+
+// CREATE NEW TITLE
+app.post('/api/admin/titles', authenticateToken, requireAdmin, async (req, res) => {
+    try {
+        const {
+            title_id,
+            title,
+            type,
+            pub_id,
+            price,
+            advance,
+            royalty,
+            ytd_sales,
+            notes,
+            pubdate
+        } = req.body;
+
+        if (!title_id || !title || !type || !pub_id || !pubdate) {
+            return res.status(400).json({
+                message: 'Title ID, title name, type, publisher, and publication date are required.'
+            });
+        }
+
+        const cleanTitleId = title_id.trim().toUpperCase();
+        const cleanTitle = title.trim();
+        const cleanType = type.trim();
+        const cleanPubId = pub_id.trim();
+
+        const cleanNotes = notes ? notes.trim() : null;
+
+        const parsedPrice = price === null || price === undefined || price === '' ? null : Number(price);
+        const parsedAdvance = advance === null || advance === undefined || advance === '' ? null : Number(advance);
+        const parsedRoyalty = royalty === null || royalty === undefined || royalty === '' ? null : Number(royalty);
+        const parsedYtdSales = ytd_sales === null || ytd_sales === undefined || ytd_sales === '' ? null : Number(ytd_sales);
+
+        const parsedPubDate = new Date(pubdate);
+
+        if (!/^[A-Z]{2}[0-9]{4}$/.test(cleanTitleId)) {
+            return res.status(400).json({
+                message: 'Title ID must be 6 characters in this format: two letters followed by four numbers. Example: BU9999.'
+            });
+        }
+
+        if (!cleanTitle) {
+            return res.status(400).json({
+                message: 'Title name is required.'
+            });
+        }
+
+        if (cleanTitle.length > 80) {
+            return res.status(400).json({
+                message: 'Title name cannot be longer than 80 characters.'
+            });
+        }
+
+        if (!cleanType) {
+            return res.status(400).json({
+                message: 'Title type is required.'
+            });
+        }
+
+        if (cleanType.length > 12) {
+            return res.status(400).json({
+                message: 'Title type cannot be longer than 12 characters.'
+            });
+        }
+
+        if (cleanPubId.length !== 4) {
+            return res.status(400).json({
+                message: 'Publisher ID must be exactly 4 characters.'
+            });
+        }
+
+        if (parsedPrice !== null && (Number.isNaN(parsedPrice) || parsedPrice < 0)) {
+            return res.status(400).json({
+                message: 'Price must be a valid positive number.'
+            });
+        }
+
+        if (parsedAdvance !== null && (Number.isNaN(parsedAdvance) || parsedAdvance < 0)) {
+            return res.status(400).json({
+                message: 'Advance must be a valid positive number.'
+            });
+        }
+
+        if (parsedRoyalty !== null && (!Number.isInteger(parsedRoyalty) || parsedRoyalty < 0 || parsedRoyalty > 100)) {
+            return res.status(400).json({
+                message: 'Royalty must be a whole number between 0 and 100.'
+            });
+        }
+
+        if (parsedYtdSales !== null && (!Number.isInteger(parsedYtdSales) || parsedYtdSales < 0)) {
+            return res.status(400).json({
+                message: 'Year-to-date sales must be a whole number greater than or equal to 0.'
+            });
+        }
+
+        if (cleanNotes && cleanNotes.length > 200) {
+            return res.status(400).json({
+                message: 'Notes cannot be longer than 200 characters.'
+            });
+        }
+
+        if (Number.isNaN(parsedPubDate.getTime())) {
+            return res.status(400).json({
+                message: 'Publication date is not valid.'
+            });
+        }
+
+        const pool = await sql.connect(dbConfig);
+
+        // check if title ID already exists
+        const titleIdCheck = await pool.request()
+            .input('title_id', sql.VarChar(6), cleanTitleId)
+            .query(`
+                SELECT title_id
+                FROM titles
+                WHERE title_id = @title_id
+            `);
+
+        if (titleIdCheck.recordset.length > 0) {
+            return res.status(409).json({
+                message: 'Title ID already exists.'
+            });
+        }
+
+        // check if title name already exists
+        const titleNameCheck = await pool.request()
+            .input('title', sql.VarChar(80), cleanTitle)
+            .query(`
+                SELECT title_id
+                FROM titles
+                WHERE LOWER(LTRIM(RTRIM(title))) = LOWER(LTRIM(RTRIM(@title)))
+            `);
+
+        if (titleNameCheck.recordset.length > 0) {
+            return res.status(409).json({
+                message: 'A title with this name already exists.'
+            });
+        }
+
+        // check selected publisher exists
+        const publisherCheck = await pool.request()
+            .input('pub_id', sql.Char(4), cleanPubId)
+            .query(`
+                SELECT pub_id
+                FROM publishers
+                WHERE pub_id = @pub_id
+            `);
+
+        if (publisherCheck.recordset.length === 0) {
+            return res.status(400).json({
+                message: 'Selected publisher does not exist.'
+            });
+        }
+
+        const result = await pool.request()
+            .input('title_id', sql.VarChar(6), cleanTitleId)
+            .input('title', sql.VarChar(80), cleanTitle)
+            .input('type', sql.Char(12), cleanType)
+            .input('pub_id', sql.Char(4), cleanPubId)
+            .input('price', sql.Money, parsedPrice)
+            .input('advance', sql.Money, parsedAdvance)
+            .input('royalty', sql.Int, parsedRoyalty)
+            .input('ytd_sales', sql.Int, parsedYtdSales)
+            .input('notes', sql.VarChar(200), cleanNotes)
+            .input('pubdate', sql.DateTime, parsedPubDate)
+            .query(`
+                INSERT INTO titles
+                    (
+                        title_id,
+                        title,
+                        type,
+                        pub_id,
+                        price,
+                        advance,
+                        royalty,
+                        ytd_sales,
+                        notes,
+                        pubdate
+                    )
+                OUTPUT
+                    INSERTED.title_id,
+                    INSERTED.title,
+                    INSERTED.type,
+                    INSERTED.pub_id,
+                    INSERTED.price,
+                    INSERTED.advance,
+                    INSERTED.royalty,
+                    INSERTED.ytd_sales,
+                    INSERTED.notes,
+                    INSERTED.pubdate
+                VALUES
+                    (
+                        @title_id,
+                        @title,
+                        @type,
+                        @pub_id,
+                        @price,
+                        @advance,
+                        @royalty,
+                        @ytd_sales,
+                        @notes,
+                        @pubdate
+                    )
+            `);
+
+        res.status(201).json({
+            message: 'Title created successfully.',
+            title: result.recordset[0]
+        });
+
+    } catch (err) {
+        console.error('Create title error:', err);
+
+        res.status(500).json({
+            message: 'Error creating title.',
+            error: err.message
+        });
+    }
+});
+
+
+
+// UPDATE EXISTING TITLE
+app.put('/api/admin/titles/:title_id', authenticateToken, requireAdmin, async (req, res) => {
+    try {
+        const titleId = req.params.title_id;
+
+        const {
+            title,
+            type,
+            pub_id,
+            price,
+            advance,
+            royalty,
+            ytd_sales,
+            notes,
+            pubdate
+        } = req.body;
+
+        if (!titleId || !title || !type || !pub_id || !pubdate) {
+            return res.status(400).json({
+                message: 'Title ID, title name, type, publisher, and publication date are required.'
+            });
+        }
+
+        const cleanTitleId = titleId.trim().toUpperCase();
+        const cleanTitle = title.trim();
+        const cleanType = type.trim();
+        const cleanPubId = pub_id.trim();
+
+        const cleanNotes = notes ? notes.trim() : null;
+
+        const parsedPrice = price === null || price === undefined || price === '' ? null : Number(price);
+        const parsedAdvance = advance === null || advance === undefined || advance === '' ? null : Number(advance);
+        const parsedRoyalty = royalty === null || royalty === undefined || royalty === '' ? null : Number(royalty);
+        const parsedYtdSales = ytd_sales === null || ytd_sales === undefined || ytd_sales === '' ? null : Number(ytd_sales);
+
+        const parsedPubDate = new Date(pubdate);
+
+        if (!/^[A-Z]{2}[0-9]{4}$/.test(cleanTitleId)) {
+            return res.status(400).json({
+                message: 'Title ID must be 6 characters in this format: two letters followed by four numbers. Example: BU9999.'
+            });
+        }
+
+        if (!cleanTitle) {
+            return res.status(400).json({
+                message: 'Title name is required.'
+            });
+        }
+
+        if (cleanTitle.length > 80) {
+            return res.status(400).json({
+                message: 'Title name cannot be longer than 80 characters.'
+            });
+        }
+
+        if (!cleanType) {
+            return res.status(400).json({
+                message: 'Title type is required.'
+            });
+        }
+
+        if (cleanType.length > 12) {
+            return res.status(400).json({
+                message: 'Title type cannot be longer than 12 characters.'
+            });
+        }
+
+        if (cleanPubId.length !== 4) {
+            return res.status(400).json({
+                message: 'Publisher ID must be exactly 4 characters.'
+            });
+        }
+
+        if (parsedPrice !== null && (Number.isNaN(parsedPrice) || parsedPrice < 0)) {
+            return res.status(400).json({
+                message: 'Price must be a valid positive number.'
+            });
+        }
+
+        if (parsedAdvance !== null && (Number.isNaN(parsedAdvance) || parsedAdvance < 0)) {
+            return res.status(400).json({
+                message: 'Advance must be a valid positive number.'
+            });
+        }
+
+        if (parsedRoyalty !== null && (!Number.isInteger(parsedRoyalty) || parsedRoyalty < 0 || parsedRoyalty > 100)) {
+            return res.status(400).json({
+                message: 'Royalty must be a whole number between 0 and 100.'
+            });
+        }
+
+        if (parsedYtdSales !== null && (!Number.isInteger(parsedYtdSales) || parsedYtdSales < 0)) {
+            return res.status(400).json({
+                message: 'Year-to-date sales must be a whole number greater than or equal to 0.'
+            });
+        }
+
+        if (cleanNotes && cleanNotes.length > 200) {
+            return res.status(400).json({
+                message: 'Notes cannot be longer than 200 characters.'
+            });
+        }
+
+        if (Number.isNaN(parsedPubDate.getTime())) {
+            return res.status(400).json({
+                message: 'Publication date is not valid.'
+            });
+        }
+
+        const pool = await sql.connect(dbConfig);
+
+        // check if title exists
+        const titleCheck = await pool.request()
+            .input('title_id', sql.VarChar(6), cleanTitleId)
+            .query(`
+                SELECT title_id
+                FROM titles
+                WHERE title_id = @title_id
+            `);
+
+        if (titleCheck.recordset.length === 0) {
+            return res.status(404).json({
+                message: 'Title not found.'
+            });
+        }
+
+        // check duplicate title name but ignore current title
+        const duplicateCheck = await pool.request()
+            .input('title_id', sql.VarChar(6), cleanTitleId)
+            .input('title', sql.VarChar(80), cleanTitle)
+            .query(`
+                SELECT title_id
+                FROM titles
+                WHERE LOWER(LTRIM(RTRIM(title))) = LOWER(LTRIM(RTRIM(@title)))
+                AND title_id <> @title_id
+            `);
+
+        if (duplicateCheck.recordset.length > 0) {
+            return res.status(409).json({
+                message: 'Another title with this name already exists.'
+            });
+        }
+
+        // check selected publisher exists
+        const publisherCheck = await pool.request()
+            .input('pub_id', sql.Char(4), cleanPubId)
+            .query(`
+                SELECT pub_id
+                FROM publishers
+                WHERE pub_id = @pub_id
+            `);
+
+        if (publisherCheck.recordset.length === 0) {
+            return res.status(400).json({
+                message: 'Selected publisher does not exist.'
+            });
+        }
+
+        await pool.request()
+            .input('title_id', sql.VarChar(6), cleanTitleId)
+            .input('title', sql.VarChar(80), cleanTitle)
+            .input('type', sql.Char(12), cleanType)
+            .input('pub_id', sql.Char(4), cleanPubId)
+            .input('price', sql.Money, parsedPrice)
+            .input('advance', sql.Money, parsedAdvance)
+            .input('royalty', sql.Int, parsedRoyalty)
+            .input('ytd_sales', sql.Int, parsedYtdSales)
+            .input('notes', sql.VarChar(200), cleanNotes)
+            .input('pubdate', sql.DateTime, parsedPubDate)
+            .query(`
+                UPDATE titles
+                SET
+                    title = @title,
+                    type = @type,
+                    pub_id = @pub_id,
+                    price = @price,
+                    advance = @advance,
+                    royalty = @royalty,
+                    ytd_sales = @ytd_sales,
+                    notes = @notes,
+                    pubdate = @pubdate
+                WHERE title_id = @title_id
+            `);
+
+        res.json({
+            message: 'Title updated successfully.'
+        });
+
+    } catch (err) {
+        console.error('Update title error:', err);
+
+        res.status(500).json({
+            message: 'Error updating title.',
+            error: err.message
+        });
+    }
+});
+
+
+
+// DELETE TITLE
+app.delete('/api/admin/titles/:title_id', authenticateToken, requireAdmin, async (req, res) => {
+    try {
+        const titleId = req.params.title_id;
+
+        if (!titleId || titleId.trim().length !== 6) {
+            return res.status(400).json({
+                message: 'Valid title ID is required.'
+            });
+        }
+
+        const cleanTitleId = titleId.trim().toUpperCase();
+
+        const pool = await sql.connect(dbConfig);
+
+        // check if title exists
+        const titleCheck = await pool.request()
+            .input('title_id', sql.VarChar(6), cleanTitleId)
+            .query(`
+                SELECT title_id, title
+                FROM titles
+                WHERE title_id = @title_id
+            `);
+
+        if (titleCheck.recordset.length === 0) {
+            return res.status(404).json({
+                message: 'Title not found.'
+            });
+        }
+
+        // check if sales are using this title
+        const salesCheck = await pool.request()
+            .input('title_id', sql.VarChar(6), cleanTitleId)
+            .query(`
+                SELECT COUNT(*) AS salesCount
+                FROM sales
+                WHERE title_id = @title_id
+            `);
+
+        const salesCount = salesCheck.recordset[0].salesCount;
+
+        if (salesCount > 0) {
+            return res.status(400).json({
+                message: `This title cannot be deleted because ${salesCount} sales record(s) are connected to it. Delete or reassign those sales first.`
+            });
+        }
+
+        // check if title authors are using this title
+        const titleAuthorCheck = await pool.request()
+            .input('title_id', sql.VarChar(6), cleanTitleId)
+            .query(`
+                SELECT COUNT(*) AS titleAuthorCount
+                FROM titleauthor
+                WHERE title_id = @title_id
+            `);
+
+        const titleAuthorCount = titleAuthorCheck.recordset[0].titleAuthorCount;
+
+        if (titleAuthorCount > 0) {
+            return res.status(400).json({
+                message: `This title cannot be deleted because ${titleAuthorCount} author assignment record(s) are connected to it. Delete or update those title author records first.`
+            });
+        }
+
+        // check if royalty schedule is using this title
+        const royaltyCheck = await pool.request()
+            .input('title_id', sql.VarChar(6), cleanTitleId)
+            .query(`
+                SELECT COUNT(*) AS royaltyCount
+                FROM roysched
+                WHERE title_id = @title_id
+            `);
+
+        const royaltyCount = royaltyCheck.recordset[0].royaltyCount;
+
+        if (royaltyCount > 0) {
+            return res.status(400).json({
+                message: `This title cannot be deleted because ${royaltyCount} royalty schedule record(s) are connected to it. Delete or update those royalty schedule records first.`
+            });
+        }
+
+        await pool.request()
+            .input('title_id', sql.VarChar(6), cleanTitleId)
+            .query(`
+                DELETE FROM titles
+                WHERE title_id = @title_id
+            `);
+
+        res.json({
+            message: 'Title deleted successfully.'
+        });
+
+    } catch (err) {
+        console.error('Delete title error:', err);
+
+        res.status(500).json({
+            message: 'Error deleting title.',
+            error: err.message
+        });
+    }
+});
 
 
 
