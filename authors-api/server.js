@@ -205,6 +205,103 @@ async function requireAdmin(req, res, next) {
 
 
 
+
+
+
+
+// SALES ACCESS CHECK MIDDLEWARE
+// sales page is sensitive
+// allowed users: Admin, CEO, CFO, Sales, Business Operations Manager, Marketing Manager
+async function requireSalesAccess(req, res, next) {
+    try {
+        if (!req.user || !req.user.user_id) {
+            return res.status(403).json({
+                message: 'Access denied. Sales access only.'
+            });
+        }
+
+        const pool = await sql.connect(dbConfig);
+
+        const userCheck = await pool.request()
+            .input('user_id', sql.Int, req.user.user_id)
+            .query(`
+                SELECT
+                    au.user_id,
+                    au.emp_id,
+                    au.is_admin,
+                    au.is_active,
+
+                    e.fname,
+                    e.lname,
+
+                    j.job_desc
+                FROM app_users au
+                LEFT JOIN employee e ON au.emp_id = e.emp_id
+                LEFT JOIN jobs j ON e.job_id = j.job_id
+                WHERE au.user_id = @user_id
+            `);
+
+        if (userCheck.recordset.length === 0) {
+            return res.status(403).json({
+                message: 'Access denied. User account was not found.'
+            });
+        }
+
+        const currentUser = userCheck.recordset[0];
+
+        if (!currentUser.is_active) {
+            return res.status(403).json({
+                message: 'Access denied. Your account is disabled.'
+            });
+        }
+
+        if (currentUser.is_admin) {
+            req.currentUserFromDatabase = currentUser;
+            return next();
+        }
+
+        const jobDescription = currentUser.job_desc ? currentUser.job_desc.trim().toLowerCase() : '';
+
+        const allowedSalesRoles = [
+            'chief executive officer',
+            'chief financial officer',
+            'sales representative',
+            'sales',
+            'business operations manager',
+            'marketing manager'
+        ];
+
+        if (!allowedSalesRoles.includes(jobDescription)) {
+            return res.status(403).json({
+                message: 'Access denied. Sales page is only available to CEO, CFO, Sales, Business Operations Manager, Marketing Manager, or System Administrator.'
+            });
+        }
+
+        req.currentUserFromDatabase = currentUser;
+
+        next();
+
+    } catch (err) {
+        console.error('Sales access check error:', err);
+
+        res.status(500).json({
+            message: 'Error checking sales access permissions.',
+            error: err.message
+        });
+    }
+}
+
+
+
+
+
+
+
+
+
+
+
+
                                                                                 // ADMIN CREATE EMPLOYEE AND SEND REGISTRATION INVITE
                                                                                 app.post('/api/admin/employees/invite', authenticateToken, requireAdmin, async (req, res) => {
                                                                                     try {
@@ -2231,6 +2328,736 @@ app.delete('/api/admin/titles/:title_id', authenticateToken, requireAdmin, async
 
         res.status(500).json({
             message: 'Error deleting title.',
+            error: err.message
+        });
+    }
+});
+
+
+
+
+
+
+
+
+//>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>SALES >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
+
+// SALES MANAGEMENT ROUTES
+// sales page is sensitive
+// these routes are used for viewing, creating, editing, deleting, and reporting sales
+// sales use a composite key in the Pubs database: stor_id + ord_num + title_id
+
+
+
+// GET SALES FOR SALES MANAGEMENT PAGE
+app.get('/api/sales', authenticateToken, requireSalesAccess, async (req, res) => {
+    try {
+        const pool = await sql.connect(dbConfig);
+
+        const result = await pool.request().query(`
+            SELECT
+                s.stor_id,
+                s.ord_num,
+                s.ord_date,
+                s.qty,
+                s.payterms,
+                s.title_id,
+
+                st.stor_name,
+                st.city AS store_city,
+                st.state AS store_state,
+
+                t.title,
+                t.type,
+                t.price,
+                t.pub_id,
+
+                p.pub_name,
+
+                CAST(ISNULL(t.price, 0) * ISNULL(s.qty, 0) AS money) AS estimated_revenue
+            FROM sales s
+            LEFT JOIN stores st ON s.stor_id = st.stor_id
+            LEFT JOIN titles t ON s.title_id = t.title_id
+            LEFT JOIN publishers p ON t.pub_id = p.pub_id
+            ORDER BY s.ord_date DESC, s.ord_num
+        `);
+
+        res.json(result.recordset);
+    } catch (err) {
+        console.error('Get sales error:', err);
+
+        res.status(500).json({
+            message: 'Error getting sales.',
+            error: err.message
+        });
+    }
+});
+
+
+
+// GET STORES FOR SALES FORM
+app.get('/api/sales/stores', authenticateToken, requireSalesAccess, async (req, res) => {
+    try {
+        const pool = await sql.connect(dbConfig);
+
+        const result = await pool.request().query(`
+            SELECT
+                stor_id,
+                stor_name,
+                stor_address,
+                city,
+                state,
+                zip
+            FROM stores
+            ORDER BY stor_name
+        `);
+
+        res.json(result.recordset);
+    } catch (err) {
+        console.error('Get stores error:', err);
+
+        res.status(500).json({
+            message: 'Error getting stores.',
+            error: err.message
+        });
+    }
+});
+
+
+
+// CREATE NEW SALE
+app.post('/api/sales', authenticateToken, requireSalesAccess, async (req, res) => {
+    try {
+        const {
+            stor_id,
+            ord_num,
+            ord_date,
+            qty,
+            payterms,
+            title_id
+        } = req.body;
+
+        if (!stor_id || !ord_num || !ord_date || qty === null || qty === undefined || !payterms || !title_id) {
+            return res.status(400).json({
+                message: 'Store, order number, order date, quantity, pay terms, and title are required.'
+            });
+        }
+
+        const cleanStoreId = stor_id.trim();
+        const cleanOrderNumber = ord_num.trim();
+        const cleanPayTerms = payterms.trim();
+        const cleanTitleId = title_id.trim().toUpperCase();
+
+        const parsedOrderDate = new Date(ord_date);
+        const parsedQty = Number(qty);
+
+        if (cleanStoreId.length !== 4) {
+            return res.status(400).json({
+                message: 'Store ID must be exactly 4 characters.'
+            });
+        }
+
+        if (!cleanOrderNumber || cleanOrderNumber.length > 20) {
+            return res.status(400).json({
+                message: 'Order number is required and cannot be longer than 20 characters.'
+            });
+        }
+
+        if (Number.isNaN(parsedOrderDate.getTime())) {
+            return res.status(400).json({
+                message: 'Order date is not valid.'
+            });
+        }
+
+        if (!Number.isInteger(parsedQty) || parsedQty <= 0) {
+            return res.status(400).json({
+                message: 'Quantity must be a whole number greater than 0.'
+            });
+        }
+
+        if (!cleanPayTerms || cleanPayTerms.length > 12) {
+            return res.status(400).json({
+                message: 'Pay terms are required and cannot be longer than 12 characters.'
+            });
+        }
+
+        if (cleanTitleId.length !== 6) {
+            return res.status(400).json({
+                message: 'Title ID must be exactly 6 characters.'
+            });
+        }
+
+        const pool = await sql.connect(dbConfig);
+
+        // check selected store exists
+        const storeCheck = await pool.request()
+            .input('stor_id', sql.Char(4), cleanStoreId)
+            .query(`
+                SELECT stor_id
+                FROM stores
+                WHERE stor_id = @stor_id
+            `);
+
+        if (storeCheck.recordset.length === 0) {
+            return res.status(400).json({
+                message: 'Selected store does not exist.'
+            });
+        }
+
+        // check selected title exists
+        const titleCheck = await pool.request()
+            .input('title_id', sql.VarChar(6), cleanTitleId)
+            .query(`
+                SELECT title_id
+                FROM titles
+                WHERE title_id = @title_id
+            `);
+
+        if (titleCheck.recordset.length === 0) {
+            return res.status(400).json({
+                message: 'Selected title does not exist.'
+            });
+        }
+
+        // check duplicate sale composite key
+        const duplicateCheck = await pool.request()
+            .input('stor_id', sql.Char(4), cleanStoreId)
+            .input('ord_num', sql.VarChar(20), cleanOrderNumber)
+            .input('title_id', sql.VarChar(6), cleanTitleId)
+            .query(`
+                SELECT
+                    stor_id,
+                    ord_num,
+                    title_id
+                FROM sales
+                WHERE stor_id = @stor_id
+                AND ord_num = @ord_num
+                AND title_id = @title_id
+            `);
+
+        if (duplicateCheck.recordset.length > 0) {
+            return res.status(409).json({
+                message: 'This sale already exists for the selected store, order number, and title.'
+            });
+        }
+
+        const result = await pool.request()
+            .input('stor_id', sql.Char(4), cleanStoreId)
+            .input('ord_num', sql.VarChar(20), cleanOrderNumber)
+            .input('ord_date', sql.DateTime, parsedOrderDate)
+            .input('qty', sql.SmallInt, parsedQty)
+            .input('payterms', sql.VarChar(12), cleanPayTerms)
+            .input('title_id', sql.VarChar(6), cleanTitleId)
+            .query(`
+                INSERT INTO sales
+                    (
+                        stor_id,
+                        ord_num,
+                        ord_date,
+                        qty,
+                        payterms,
+                        title_id
+                    )
+                OUTPUT
+                    INSERTED.stor_id,
+                    INSERTED.ord_num,
+                    INSERTED.ord_date,
+                    INSERTED.qty,
+                    INSERTED.payterms,
+                    INSERTED.title_id
+                VALUES
+                    (
+                        @stor_id,
+                        @ord_num,
+                        @ord_date,
+                        @qty,
+                        @payterms,
+                        @title_id
+                    )
+            `);
+
+        res.status(201).json({
+            message: 'Sale created successfully.',
+            sale: result.recordset[0]
+        });
+
+    } catch (err) {
+        console.error('Create sale error:', err);
+
+        res.status(500).json({
+            message: 'Error creating sale.',
+            error: err.message
+        });
+    }
+});
+
+
+
+// UPDATE EXISTING SALE
+// we keep stor_id, ord_num, and title_id as the original key
+// user can update order date, quantity, and pay terms
+app.put('/api/sales/:stor_id/:ord_num/:title_id', authenticateToken, requireSalesAccess, async (req, res) => {
+    try {
+        const originalStoreId = req.params.stor_id;
+        const originalOrderNumber = req.params.ord_num;
+        const originalTitleId = req.params.title_id;
+
+        const {
+            ord_date,
+            qty,
+            payterms
+        } = req.body;
+
+        if (!originalStoreId || !originalOrderNumber || !originalTitleId || !ord_date || qty === null || qty === undefined || !payterms) {
+            return res.status(400).json({
+                message: 'Original sale key, order date, quantity, and pay terms are required.'
+            });
+        }
+
+        const cleanOriginalStoreId = originalStoreId.trim();
+        const cleanOriginalOrderNumber = originalOrderNumber.trim();
+        const cleanOriginalTitleId = originalTitleId.trim().toUpperCase();
+
+        const cleanPayTerms = payterms.trim();
+
+        const parsedOrderDate = new Date(ord_date);
+        const parsedQty = Number(qty);
+
+        if (cleanOriginalStoreId.length !== 4) {
+            return res.status(400).json({
+                message: 'Store ID must be exactly 4 characters.'
+            });
+        }
+
+        if (!cleanOriginalOrderNumber || cleanOriginalOrderNumber.length > 20) {
+            return res.status(400).json({
+                message: 'Order number is required and cannot be longer than 20 characters.'
+            });
+        }
+
+        if (cleanOriginalTitleId.length !== 6) {
+            return res.status(400).json({
+                message: 'Title ID must be exactly 6 characters.'
+            });
+        }
+
+        if (Number.isNaN(parsedOrderDate.getTime())) {
+            return res.status(400).json({
+                message: 'Order date is not valid.'
+            });
+        }
+
+        if (!Number.isInteger(parsedQty) || parsedQty <= 0) {
+            return res.status(400).json({
+                message: 'Quantity must be a whole number greater than 0.'
+            });
+        }
+
+        if (!cleanPayTerms || cleanPayTerms.length > 12) {
+            return res.status(400).json({
+                message: 'Pay terms are required and cannot be longer than 12 characters.'
+            });
+        }
+
+        const pool = await sql.connect(dbConfig);
+
+        // check if sale exists
+        const saleCheck = await pool.request()
+            .input('stor_id', sql.Char(4), cleanOriginalStoreId)
+            .input('ord_num', sql.VarChar(20), cleanOriginalOrderNumber)
+            .input('title_id', sql.VarChar(6), cleanOriginalTitleId)
+            .query(`
+                SELECT
+                    stor_id,
+                    ord_num,
+                    title_id
+                FROM sales
+                WHERE stor_id = @stor_id
+                AND ord_num = @ord_num
+                AND title_id = @title_id
+            `);
+
+        if (saleCheck.recordset.length === 0) {
+            return res.status(404).json({
+                message: 'Sale not found.'
+            });
+        }
+
+        await pool.request()
+            .input('stor_id', sql.Char(4), cleanOriginalStoreId)
+            .input('ord_num', sql.VarChar(20), cleanOriginalOrderNumber)
+            .input('title_id', sql.VarChar(6), cleanOriginalTitleId)
+            .input('ord_date', sql.DateTime, parsedOrderDate)
+            .input('qty', sql.SmallInt, parsedQty)
+            .input('payterms', sql.VarChar(12), cleanPayTerms)
+            .query(`
+                UPDATE sales
+                SET
+                    ord_date = @ord_date,
+                    qty = @qty,
+                    payterms = @payterms
+                WHERE stor_id = @stor_id
+                AND ord_num = @ord_num
+                AND title_id = @title_id
+            `);
+
+        res.json({
+            message: 'Sale updated successfully.'
+        });
+
+    } catch (err) {
+        console.error('Update sale error:', err);
+
+        res.status(500).json({
+            message: 'Error updating sale.',
+            error: err.message
+        });
+    }
+});
+
+
+
+// DELETE SALE
+app.delete('/api/sales/:stor_id/:ord_num/:title_id', authenticateToken, requireSalesAccess, async (req, res) => {
+    try {
+        const originalStoreId = req.params.stor_id;
+        const originalOrderNumber = req.params.ord_num;
+        const originalTitleId = req.params.title_id;
+
+        if (!originalStoreId || !originalOrderNumber || !originalTitleId) {
+            return res.status(400).json({
+                message: 'Original sale key is required.'
+            });
+        }
+
+        const cleanOriginalStoreId = originalStoreId.trim();
+        const cleanOriginalOrderNumber = originalOrderNumber.trim();
+        const cleanOriginalTitleId = originalTitleId.trim().toUpperCase();
+
+        const pool = await sql.connect(dbConfig);
+
+        // check if sale exists
+        const saleCheck = await pool.request()
+            .input('stor_id', sql.Char(4), cleanOriginalStoreId)
+            .input('ord_num', sql.VarChar(20), cleanOriginalOrderNumber)
+            .input('title_id', sql.VarChar(6), cleanOriginalTitleId)
+            .query(`
+                SELECT
+                    stor_id,
+                    ord_num,
+                    title_id
+                FROM sales
+                WHERE stor_id = @stor_id
+                AND ord_num = @ord_num
+                AND title_id = @title_id
+            `);
+
+        if (saleCheck.recordset.length === 0) {
+            return res.status(404).json({
+                message: 'Sale not found.'
+            });
+        }
+
+        await pool.request()
+            .input('stor_id', sql.Char(4), cleanOriginalStoreId)
+            .input('ord_num', sql.VarChar(20), cleanOriginalOrderNumber)
+            .input('title_id', sql.VarChar(6), cleanOriginalTitleId)
+            .query(`
+                DELETE FROM sales
+                WHERE stor_id = @stor_id
+                AND ord_num = @ord_num
+                AND title_id = @title_id
+            `);
+
+        res.json({
+            message: 'Sale deleted successfully.'
+        });
+
+    } catch (err) {
+        console.error('Delete sale error:', err);
+
+        res.status(500).json({
+            message: 'Error deleting sale.',
+            error: err.message
+        });
+    }
+});
+
+
+
+// EMAIL SALE SUMMARY
+// this uses the same email setup as your employee invite email
+app.post('/api/sales/email-summary', authenticateToken, requireSalesAccess, async (req, res) => {
+    try {
+        const {
+            to,
+            sale
+        } = req.body;
+
+        if (!to || !sale) {
+            return res.status(400).json({
+                message: 'Recipient email and sale summary are required.'
+            });
+        }
+
+        const escapeHtml = (value) => {
+            return String(value ?? '')
+                .replaceAll('&', '&amp;')
+                .replaceAll('<', '&lt;')
+                .replaceAll('>', '&gt;')
+                .replaceAll('"', '&quot;')
+                .replaceAll("'", '&#039;');
+        };
+
+        const formatMoney = (value) => {
+            return Number(value ?? 0).toFixed(2);
+        };
+
+        const quantity = Number(sale.qty ?? 0);
+        const unitPrice = Number(sale.price ?? 0);
+        const estimatedRevenue = Number(sale.estimated_revenue ?? quantity * unitPrice);
+
+        const subject = `Sale Summary - Order ${sale.ord_num}`;
+
+        const html = `
+            <div style="font-family: Arial, Helvetica, sans-serif; background-color: #f3f5f7; padding: 24px; color: #1a1a1a;">
+                <div style="max-width: 820px; margin: 0 auto; background-color: #ffffff; border: 1px solid #d6d6d6;">
+
+                    <div style="height: 10px; background: linear-gradient(90deg, #0066cc, #137333);"></div>
+
+                    <div style="padding: 30px;">
+
+                        <div style="display: table; width: 100%; border-bottom: 2px solid #1a1a1a; padding-bottom: 22px; margin-bottom: 24px;">
+                            <div style="display: table-cell; width: 60%; vertical-align: top;">
+                                <h1 style="margin: 0; font-size: 28px; color: #1a1a1a;">
+                                    Pubs Sales Management
+                                </h1>
+
+                                <p style="margin: 6px 0 0 0; color: #555555; font-size: 13px; line-height: 1.5;">
+                                    Professional Sales Order Summary<br>
+                                    Generated from the protected sales reporting area
+                                </p>
+                            </div>
+
+                            <div style="display: table-cell; width: 40%; vertical-align: top;">
+                                <div style="border: 1px solid #d6d6d6; background-color: #fafafa; padding: 14px;">
+                                    <div style="font-size: 11px; text-transform: uppercase; color: #555555; font-weight: 700;">
+                                        Sales Order Summary
+                                    </div>
+
+                                    <div style="font-size: 22px; font-weight: 800; color: #0066cc; margin-top: 4px;">
+                                        ${escapeHtml(sale.ord_num)}
+                                    </div>
+
+                                    <div style="margin-top: 12px; font-size: 12px; color: #333333; line-height: 1.7;">
+                                        <div><strong>Order Date:</strong> ${escapeHtml(sale.ord_date)}</div>
+                                        <div><strong>Store ID:</strong> ${escapeHtml(sale.stor_id)}</div>
+                                        <div><strong>Title ID:</strong> ${escapeHtml(sale.title_id)}</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div style="display: table; width: 100%; margin-bottom: 24px;">
+                            <div style="display: table-cell; width: 33%; padding-right: 10px;">
+                                <div style="border: 1px solid #d6d6d6; border-left: 5px solid #1a1a1a; padding: 14px;">
+                                    <div style="font-size: 11px; text-transform: uppercase; color: #555555; font-weight: 700;">
+                                        Payment Terms
+                                    </div>
+                                    <div style="font-size: 18px; font-weight: 800; margin-top: 6px;">
+                                        ${escapeHtml(sale.payterms)}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div style="display: table-cell; width: 33%; padding-right: 10px;">
+                                <div style="border: 1px solid #d6d6d6; border-left: 5px solid #0066cc; padding: 14px;">
+                                    <div style="font-size: 11px; text-transform: uppercase; color: #555555; font-weight: 700;">
+                                        Quantity Sold
+                                    </div>
+                                    <div style="font-size: 18px; font-weight: 800; margin-top: 6px;">
+                                        ${quantity}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div style="display: table-cell; width: 34%;">
+                                <div style="border: 1px solid #d6d6d6; border-left: 5px solid #137333; background-color: #f3fbf6; padding: 14px;">
+                                    <div style="font-size: 11px; text-transform: uppercase; color: #555555; font-weight: 700;">
+                                        Estimated Revenue
+                                    </div>
+                                    <div style="font-size: 18px; font-weight: 800; color: #137333; margin-top: 6px;">
+                                        $${formatMoney(estimatedRevenue)}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <h2 style="font-size: 15px; text-transform: uppercase; border-bottom: 1px solid #d6d6d6; padding-bottom: 8px; margin: 28px 0 12px 0;">
+                            Customer / Store Information
+                        </h2>
+
+                        <div style="display: table; width: 100%; margin-bottom: 24px;">
+                            <div style="display: table-cell; width: 50%; padding-right: 10px;">
+                                <div style="border: 1px solid #d6d6d6; padding: 14px;">
+                                    <h3 style="margin: 0 0 12px 0; font-size: 15px; color: #0066cc;">
+                                        Store Details
+                                    </h3>
+
+                                    <p style="margin: 6px 0;"><strong>Store:</strong> ${escapeHtml(sale.stor_name || sale.stor_id)}</p>
+                                    <p style="margin: 6px 0;"><strong>Store ID:</strong> ${escapeHtml(sale.stor_id)}</p>
+                                    <p style="margin: 6px 0;"><strong>Location:</strong> ${escapeHtml(`${sale.store_city || ''} ${sale.store_state || ''}`.trim() || 'N/A')}</p>
+                                </div>
+                            </div>
+
+                            <div style="display: table-cell; width: 50%;">
+                                <div style="border: 1px solid #d6d6d6; padding: 14px;">
+                                    <h3 style="margin: 0 0 12px 0; font-size: 15px; color: #0066cc;">
+                                        Publisher Details
+                                    </h3>
+
+                                    <p style="margin: 6px 0;"><strong>Publisher:</strong> ${escapeHtml(sale.pub_name || 'N/A')}</p>
+                                    <p style="margin: 6px 0;"><strong>Publisher ID:</strong> ${escapeHtml(sale.pub_id || 'N/A')}</p>
+                                    <p style="margin: 6px 0;"><strong>Book Type:</strong> ${escapeHtml(sale.type || 'N/A')}</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <h2 style="font-size: 15px; text-transform: uppercase; border-bottom: 1px solid #d6d6d6; padding-bottom: 8px; margin: 28px 0 12px 0;">
+                            Order Line Item
+                        </h2>
+
+                        <table style="width: 100%; border-collapse: collapse; margin-top: 12px;">
+                            <thead>
+                                <tr>
+                                    <th style="background-color: #1a1a1a; color: #ffffff; padding: 12px 10px; text-align: left; font-size: 12px;">Title</th>
+                                    <th style="background-color: #1a1a1a; color: #ffffff; padding: 12px 10px; text-align: left; font-size: 12px;">Title ID</th>
+                                    <th style="background-color: #1a1a1a; color: #ffffff; padding: 12px 10px; text-align: right; font-size: 12px;">Unit Price</th>
+                                    <th style="background-color: #1a1a1a; color: #ffffff; padding: 12px 10px; text-align: right; font-size: 12px;">Qty</th>
+                                    <th style="background-color: #1a1a1a; color: #ffffff; padding: 12px 10px; text-align: right; font-size: 12px;">Revenue</th>
+                                </tr>
+                            </thead>
+
+                            <tbody>
+                                <tr>
+                                    <td style="border-bottom: 1px solid #d6d6d6; padding: 14px 10px;">
+                                        <strong>${escapeHtml(sale.title || sale.title_id)}</strong><br>
+                                        <span style="color: #666666; font-size: 12px;">${escapeHtml(sale.pub_name || 'N/A')}</span>
+                                    </td>
+
+                                    <td style="border-bottom: 1px solid #d6d6d6; padding: 14px 10px;">
+                                        ${escapeHtml(sale.title_id)}
+                                    </td>
+
+                                    <td style="border-bottom: 1px solid #d6d6d6; padding: 14px 10px; text-align: right;">
+                                        $${formatMoney(unitPrice)}
+                                    </td>
+
+                                    <td style="border-bottom: 1px solid #d6d6d6; padding: 14px 10px; text-align: right;">
+                                        ${quantity}
+                                    </td>
+
+                                    <td style="border-bottom: 1px solid #d6d6d6; padding: 14px 10px; text-align: right; color: #137333; font-weight: 800;">
+                                        $${formatMoney(estimatedRevenue)}
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+
+                        <div style="margin-top: 24px; text-align: right;">
+                            <div style="display: inline-block; width: 340px; border: 2px solid #137333; background-color: #f3fbf6; text-align: left;">
+
+                                <div style="display: flex; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid #c7e8d1;">
+                                    <span>Subtotal</span>
+                                    <strong>$${formatMoney(estimatedRevenue)}</strong>
+                                </div>
+
+                                <div style="display: flex; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid #c7e8d1;">
+                                    <span>Tax</span>
+                                    <strong>Not calculated</strong>
+                                </div>
+
+                                <div style="display: flex; justify-content: space-between; padding: 14px 16px; background-color: #137333; color: #ffffff; font-size: 18px; font-weight: 800;">
+                                    <span>Total Estimated Revenue</span>
+                                    <strong>$${formatMoney(estimatedRevenue)}</strong>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div style="margin-top: 28px; border: 1px solid #d6d6d6; padding: 14px; background-color: #fafafa; font-size: 12px; color: #444444; line-height: 1.6;">
+                            <strong>Report Notes:</strong>
+                            This document is generated for internal business reporting purposes.
+                            Estimated revenue is calculated using the title price multiplied by quantity sold.
+                        </div>
+
+                        <div style="margin-top: 28px; padding-top: 14px; border-top: 1px solid #d6d6d6; font-size: 11px; color: #666666;">
+                            <strong style="color: #a50e0e;">Confidential Sales Information</strong>
+                            <br>
+                            Pubs Sales Management • Sales Order Summary
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+        `;
+
+        const salesTransporter = nodemailer.createTransport({
+            service: process.env.SMTP_SERVICE,
+            auth: {
+                user: process.env.SMTP_USER,
+                pass: process.env.SMTP_PASS
+            }
+        });
+
+        await salesTransporter.sendMail({
+            from: process.env.SMTP_FROM,
+            to,
+            subject,
+            html
+        });
+
+        res.json({
+            message: 'Sale summary email sent successfully.'
+        });
+
+    } catch (err) {
+        console.error('Email sale summary error:', err);
+
+        res.status(500).json({
+            message: 'Error sending sale summary email.',
+            error: err.message
+        });
+    }
+});
+
+
+
+// GET TITLES FOR SALES FORM
+app.get('/api/sales/titles', authenticateToken, requireSalesAccess, async (req, res) => {
+    try {
+        const pool = await sql.connect(dbConfig);
+
+        const result = await pool.request().query(`
+            SELECT
+                t.title_id,
+                t.title,
+                t.type,
+                t.pub_id,
+                t.price,
+
+                p.pub_name
+            FROM titles t
+            LEFT JOIN publishers p ON t.pub_id = p.pub_id
+            ORDER BY t.title
+        `);
+
+        res.json(result.recordset);
+    } catch (err) {
+        console.error('Get sales titles error:', err);
+
+        res.status(500).json({
+            message: 'Error getting titles for sales form.',
             error: err.message
         });
     }
