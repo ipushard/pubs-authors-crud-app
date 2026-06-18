@@ -1,0 +1,203 @@
+<div class="dialog-shell">
+
+  <div class="dialog-header">
+    <div>
+      <h2>Edit User / Employee</h2>
+      <p>Update employee details, position, publisher, and account permissions.</p>
+    </div>
+
+    <span class="employee-id-badge">
+      {{ employee.emp_id }}
+    </span>
+  </div>
+
+  @if (errorMessage) {
+    <div class="dialog-error">
+      {{ errorMessage }}
+    </div>
+  }
+
+  <div class="account-summary">
+
+    <div class="summary-item">
+      <span>Name</span>
+      <strong>{{ employee.fname }} {{ employee.lname }}</strong>
+    </div>
+
+    <div class="summary-item">
+      <span>Email</span>
+      <strong>{{ employee.email || 'No app account' }}</strong>
+    </div>
+
+    <div class="summary-item">
+      <span>Current Position</span>
+      <strong>{{ employee.job_desc }}</strong>
+    </div>
+
+    <div class="summary-item">
+      <span>Login Account</span>
+
+      @if (hasAppAccount()) {
+        <strong class="green-text">Yes</strong>
+      } @else {
+        <strong class="gray-text">No</strong>
+      }
+    </div>
+
+  </div>
+
+  <form class="dialog-form">
+
+    <div class="form-grid">
+
+      <mat-form-field appearance="outline">
+        <mat-label>First Name</mat-label>
+        <input
+          matInput
+          name="fname"
+          [(ngModel)]="employee.fname">
+      </mat-form-field>
+
+      <mat-form-field appearance="outline">
+        <mat-label>Middle Initial</mat-label>
+        <input
+          matInput
+          maxlength="1"
+          name="minit"
+          [(ngModel)]="employee.minit">
+      </mat-form-field>
+
+      <mat-form-field appearance="outline">
+        <mat-label>Last Name</mat-label>
+        <input
+          matInput
+          name="lname"
+          [(ngModel)]="employee.lname">
+      </mat-form-field>
+
+      <mat-form-field appearance="outline">
+        <mat-label>Publisher</mat-label>
+        <mat-select
+          name="pub_id"
+          [(ngModel)]="employee.pub_id">
+
+          @for (publisher of publishers; track publisher.pub_id) {
+            <mat-option [value]="publisher.pub_id">
+              {{ publisher.pub_name }} ({{ publisher.pub_id }})
+            </mat-option>
+          }
+
+        </mat-select>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline">
+        <mat-label>Position</mat-label>
+        <mat-select
+          name="job_id"
+          [(ngModel)]="employee.job_id"
+          (selectionChange)="onJobChange()">
+
+          @for (job of jobs; track job.job_id) {
+            <mat-option [value]="job.job_id">
+              {{ job.job_desc }}
+            </mat-option>
+          }
+
+        </mat-select>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline">
+        <mat-label>Job Level</mat-label>
+        <input
+          matInput
+          type="number"
+          name="job_lvl"
+          [(ngModel)]="employee.job_lvl">
+        <mat-hint>Must fit inside selected job min/max range.</mat-hint>
+      </mat-form-field>
+
+    </div>
+
+    <div class="security-panel">
+
+      <div class="security-title">
+        <h3>Application Account Settings</h3>
+        <p>These settings affect login access and admin permissions.</p>
+      </div>
+
+      @if (isEditingOwnAccount()) {
+        <div class="no-account-box">
+          You are editing your own account. For security reasons, you cannot remove your own admin access or deactivate your own account. Another administrator must change those permissions for you.
+        </div>
+      }
+
+      @if (hasAppAccount()) {
+        <div class="toggle-grid">
+
+          <div class="toggle-card admin-toggle">
+            <div>
+              <strong>Administrator Access</strong>
+              <span>
+                Gives full access to manage users, roles, and protected sections.
+                @if (isEditingOwnAccount()) {
+                  You cannot remove this from your own account.
+                }
+              </span>
+            </div>
+
+            <mat-slide-toggle
+              color="primary"
+              name="is_admin"
+              [disabled]="isEditingOwnAccount()"
+              [(ngModel)]="employee.is_admin">
+            </mat-slide-toggle>
+          </div>
+
+          <div class="toggle-card active-toggle">
+            <div>
+              <strong>Active Account</strong>
+              <span>
+                Disabled users cannot log into the application.
+                @if (isEditingOwnAccount()) {
+                  You cannot deactivate your own account.
+                }
+              </span>
+            </div>
+
+            <mat-slide-toggle
+              color="primary"
+              name="is_active"
+              [disabled]="isEditingOwnAccount()"
+              [(ngModel)]="employee.is_active">
+            </mat-slide-toggle>
+          </div>
+
+        </div>
+      } @else {
+        <div class="no-account-box">
+          This employee does not have a login account yet. Admin and active settings are only available for app users.
+        </div>
+      }
+
+    </div>
+
+  </form>
+
+  <div class="dialog-actions">
+    <button
+      mat-stroked-button
+      type="button"
+      (click)="cancel()">
+      Cancel
+    </button>
+
+    <button
+      mat-flat-button
+      color="primary"
+      type="button"
+      (click)="saveChanges()">
+      Save Changes
+    </button>
+  </div>
+
+</div>

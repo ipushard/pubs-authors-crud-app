@@ -1,0 +1,72 @@
+<div class="login-page">
+
+  <mat-card class="login-card">
+
+    <mat-card-header>
+      <mat-card-title>Login</mat-card-title>
+      <mat-card-subtitle>
+         Sign in to manage Pubs database records
+      </mat-card-subtitle>
+    </mat-card-header>
+
+    <mat-card-content>
+
+      @if (errorMessage) {
+        <div class="message error-message">
+          {{ errorMessage }}
+        </div>
+      }
+
+      <form class="login-form" #loginForm="ngForm" (ngSubmit)="login(loginForm)">
+
+        <mat-form-field appearance="outline">
+          <mat-label>Email</mat-label>
+
+          <input
+            matInput
+            required
+            type="email"
+            name="email"
+            [(ngModel)]="email"
+            #emailInput="ngModel">
+
+          @if ((emailInput.invalid && emailInput.touched) || (submitted && emailInput.invalid)) {
+            <mat-error>
+              Email is required.
+            </mat-error>
+          }
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>Password</mat-label>
+
+          <input
+            matInput
+            required
+            type="password"
+            name="password"
+            [(ngModel)]="password"
+            #passwordInput="ngModel">
+
+          @if ((passwordInput.invalid && passwordInput.touched) || (submitted && passwordInput.invalid)) {
+            <mat-error>
+              Password is required.
+            </mat-error>
+          }
+        </mat-form-field>
+
+        <button class="btn btn-primary login-button" type="submit" [disabled]="isLoading">
+                                  @if (isLoading) {
+                                    Signing in...
+                                  } @else {
+                                    Login
+                                  }
+                                </button>
+
+      </form>
+
+    </mat-card-content>
+
+  </mat-card>
+
+</div>

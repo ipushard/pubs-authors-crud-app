@@ -1,0 +1,270 @@
+:host {
+  display: block;
+  width: 100%;
+}
+
+.dialog-shell {
+  width: 100%;
+  max-width: 100%;
+  font-family: Arial, Helvetica, sans-serif;
+  color: #1a1a1a;
+  box-sizing: border-box;
+}
+
+
+
+
+
+
+
+/* dialog top header */
+.dialog-header {
+  background-color: #1a1a1a;
+  color: #ffffff;
+  padding: 22px 24px;
+  border-bottom: 6px solid #0066cc;
+
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+
+  box-sizing: border-box;
+}
+
+.dialog-header h2 {
+  margin: 0;
+  font-size: 26px;
+  font-weight: 800;
+}
+
+.dialog-header p {
+  margin: 6px 0 0 0;
+  color: #eeeeee;
+  font-size: 14px;
+}
+
+.employee-id-badge {
+  background-color: #ffffff;
+  color: #0066cc;
+  border-radius: 999px;
+  padding: 8px 14px;
+
+  font-size: 13px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+
+
+
+
+
+
+/* error message */
+.dialog-error {
+  margin: 16px 24px 0 24px;
+  padding: 12px 14px;
+
+  background-color: #fce8e6;
+  color: #a50e0e;
+  border: 1px solid #d93025;
+  border-radius: 4px;
+
+  font-size: 14px;
+  font-weight: 800;
+}
+
+
+
+
+
+
+
+/* small summary cards */
+.account-summary {
+  margin: 18px 24px 0 24px;
+
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.summary-item {
+  background-color: #ffffff;
+  border: 1px solid #d6d6d6;
+  border-left: 6px solid #0066cc;
+  padding: 12px;
+
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.summary-item span {
+  font-size: 11px;
+  font-weight: 900;
+  color: #555555;
+  text-transform: uppercase;
+}
+
+.summary-item strong {
+  font-size: 13px;
+  color: #1a1a1a;
+  overflow-wrap: anywhere;
+}
+
+.green-text {
+  color: #137333 !important;
+}
+
+.gray-text {
+  color: #555555 !important;
+}
+
+
+
+
+
+
+
+/* main form */
+.dialog-form {
+  padding: 22px 24px 0 24px;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.form-grid mat-form-field {
+  width: 100%;
+}
+
+
+
+
+
+
+
+/* account permission section */
+.security-panel {
+  margin-top: 10px;
+  padding: 18px;
+  background-color: #fafafa;
+  border: 1px solid #d6d6d6;
+  border-left: 6px solid #0066cc;
+}
+
+.security-title h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.security-title p {
+  margin: 4px 0 14px 0;
+  color: #555555;
+  font-size: 13px;
+}
+
+.toggle-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.toggle-card {
+  background-color: #ffffff;
+  border: 1px solid #d6d6d6;
+  padding: 14px;
+
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.toggle-card strong {
+  display: block;
+  font-size: 14px;
+  font-weight: 900;
+  color: #1a1a1a;
+}
+
+.toggle-card span {
+  display: block;
+  margin-top: 4px;
+  font-size: 12px;
+  color: #555555;
+  line-height: 1.35;
+}
+
+.admin-toggle {
+  border-left: 6px solid #0066cc;
+}
+
+.active-toggle {
+  border-left: 6px solid #137333;
+}
+
+.no-account-box {
+  background-color: #eeeeee;
+  border: 1px solid #bbbbbb;
+  padding: 14px;
+
+  font-size: 13px;
+  font-weight: 700;
+  color: #555555;
+}
+
+
+
+
+
+
+
+/* dialog buttons */
+.dialog-actions {
+  padding: 20px 24px 24px 24px;
+
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.dialog-actions button {
+  font-weight: 800;
+}
+
+
+
+
+
+
+
+@media (max-width: 800px) {
+  .dialog-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .account-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .toggle-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .dialog-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}

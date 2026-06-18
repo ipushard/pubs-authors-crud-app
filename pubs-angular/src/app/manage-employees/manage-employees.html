@@ -1,0 +1,302 @@
+<div class="manage-page">
+
+  <header class="page-header">
+    <div>
+      <h1>Manage Users / Employees</h1>
+      <p class="page-subtitle">
+        View employee records, app users, registration status, and admin accounts.
+      </p>
+    </div>
+
+    <button class="btn btn-primary" type="button" (click)="goToCreateEmployee()">
+      + New User / Employee
+    </button>
+  </header>
+
+  <section class="dashboard-grid">
+
+    <div class="dashboard-card">
+      <span class="dashboard-label">Total Employees</span>
+      <strong>{{ totalEmployees }}</strong>
+      <span class="dashboard-note">employee records</span>
+    </div>
+
+    <div class="dashboard-card">
+      <span class="dashboard-label">App Users</span>
+      <strong>{{ appUsers }}</strong>
+      <span class="dashboard-note">login accounts</span>
+    </div>
+
+    <div class="dashboard-card">
+      <span class="dashboard-label">Pending Invites</span>
+      <strong>{{ pendingInvites }}</strong>
+      <span class="dashboard-note">password not set</span>
+    </div>
+
+    <div class="dashboard-card">
+      <span class="dashboard-label">Active Accounts</span>
+      <strong>{{ activeAccounts }}</strong>
+      <span class="dashboard-note">enabled users</span>
+    </div>
+
+    <div class="dashboard-card dashboard-card-blue">
+      <span class="dashboard-label">Admin Users</span>
+      <strong>{{ adminUsers }}</strong>
+      <span class="dashboard-note">full access</span>
+    </div>
+
+    <div class="dashboard-card dashboard-card-red">
+      <span class="dashboard-label">No Login</span>
+      <strong>{{ employeesWithoutLogin }}</strong>
+      <span class="dashboard-note">employee only</span>
+    </div>
+
+  </section>
+
+  @if (errorMessage) {
+    <div class="message error-message">
+      {{ errorMessage }}
+    </div>
+  }
+
+  @if (successMessage) {
+    <div class="message success-message">
+      {{ successMessage }}
+    </div>
+  }
+
+  @if (isLoading) {
+    <div class="message loading-message">
+      Loading employees and users from database...
+    </div>
+  }
+
+  @if (isSaving) {
+    <div class="message loading-message">
+      Saving employee changes...
+    </div>
+  }
+
+  <section class="filter-card">
+
+    <button class="filter-toggle" type="button" (click)="toggleFilters()">
+      <span>Filter & Sort Employees</span>
+
+      @if (showFilters) {
+        <span class="filter-arrow">▲</span>
+      } @else {
+        <span class="filter-arrow">▼</span>
+      }
+    </button>
+
+    @if (showFilters) {
+      <div class="filter-panel">
+
+        <div class="filter-header">
+          <button class="btn btn-outline" type="button" (click)="clearFilters()">
+            Clear Filters
+          </button>
+        </div>
+
+        <div class="filter-grid">
+
+          <label>
+            Search
+            <input
+              type="text"
+              class="filter-input"
+              placeholder="Search by name, ID, email, position, or publisher"
+              [(ngModel)]="searchTerm"
+              (input)="clearSuccessMessage(); applyFiltersAndSort()">
+          </label>
+
+          <label>
+            Account Status
+            <select
+              class="filter-input"
+              [(ngModel)]="selectedAccountStatus"
+              (change)="clearSuccessMessage(); applyFiltersAndSort()">
+              <option value="all">All Records</option>
+              <option value="appUser">App Users</option>
+              <option value="noLogin">No Login</option>
+              <option value="pending">Pending Invites</option>
+              <option value="active">Active Accounts</option>
+              <option value="admin">Admin Users</option>
+            </select>
+          </label>
+
+          <label>
+            Position
+            <select
+              class="filter-input"
+              [(ngModel)]="selectedPosition"
+              (change)="clearSuccessMessage(); applyFiltersAndSort()">
+              <option value="all">All Positions</option>
+
+              @for (position of availablePositions; track position) {
+                <option [value]="position">{{ position }}</option>
+              }
+            </select>
+          </label>
+
+          <label>
+            Sort By
+            <select
+              class="filter-input"
+              [(ngModel)]="selectedSort"
+              (change)="clearSuccessMessage(); applyFiltersAndSort()">
+              <option value="lastNameAsc">Last Name A-Z</option>
+              <option value="lastNameDesc">Last Name Z-A</option>
+              <option value="firstNameAsc">First Name A-Z</option>
+              <option value="firstNameDesc">First Name Z-A</option>
+              <option value="positionAsc">Position A-Z</option>
+              <option value="positionDesc">Position Z-A</option>
+              <option value="publisherAsc">Publisher A-Z</option>
+              <option value="publisherDesc">Publisher Z-A</option>
+              <option value="hireDateNewest">Hire Date Newest</option>
+              <option value="hireDateOldest">Hire Date Oldest</option>
+            </select>
+          </label>
+
+        </div>
+      </div>
+    }
+
+  </section>
+
+  <section class="table-card">
+
+    @if (!isLoading && filteredEmployees.length === 0) {
+      <div class="empty-state">
+        <h3>No employees found</h3>
+        <p>
+          Try changing your search, filters, or account status.
+        </p>
+      </div>
+    }
+
+    <table class="employees-table">
+      <thead>
+        <tr>
+          <th>Employee ID</th>
+          <th>Name</th>
+          <th>Email</th>
+          <th>Position</th>
+          <th>Publisher</th>
+          <th>Hire Date</th>
+          <th>Account Status</th>
+          <th>Email Confirmed</th>
+          <th>Admin</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+
+      <tbody>
+        @for (employee of pagedEmployees; track employee.emp_id) {
+          <tr>
+            <td>{{ employee.emp_id }}</td>
+            <td>{{ getFullName(employee) | titlecase }}</td>
+            <td>{{ employee.email || 'No app account' }}</td>
+            <td>{{ employee.job_desc }}</td>
+            <td>{{ employee.pub_name }} ({{ employee.pub_id }})</td>
+            <td>{{ employee.hire_date | date:'mediumDate' }}</td>
+            <td>
+              <span class="status-badge" [class]="getAccountStatusClass(employee)">
+                {{ getAccountStatus(employee) }}
+              </span>
+            </td>
+            <td>{{ getYesNo(employee.email_confirmed) }}</td>
+            <td>{{ getYesNo(employee.is_admin) }}</td>
+            <td>
+              <div class="action-buttons">
+                <button
+                  class="btn btn-small btn-edit"
+                  type="button"
+                  [disabled]="isSaving"
+                  (click)="openEditDialog(employee)">
+                  Edit
+                </button>
+
+                <button
+                  class="btn btn-small btn-danger"
+                  type="button"
+                  [disabled]="isSaving"
+                  (click)="deleteEmployee(employee)">
+                  Delete
+                </button>
+              </div>
+            </td>
+          </tr>
+        } @empty {
+          <tr>
+            <td colspan="10" class="empty-row">
+              No employees match the current search or filters.
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+
+    <div class="pagination-bar">
+
+      <div class="pagination-info">
+        Showing
+        <strong>{{ getStartRecordNumber() }}</strong>
+        -
+        <strong>{{ getEndRecordNumber() }}</strong>
+        of
+        <strong>{{ filteredEmployees.length }}</strong>
+        records
+      </div>
+
+      <div class="page-size-control">
+        <label>
+          Records per page
+          <select
+            class="page-size-select"
+            [(ngModel)]="pageSize"
+            (change)="onPageSizeChange()">
+
+            @for (size of pageSizeOptions; track size) {
+              <option [ngValue]="size">{{ size }}</option>
+            }
+
+          </select>
+        </label>
+      </div>
+
+      <div class="pagination-buttons">
+
+        <button
+          class="page-btn"
+          type="button"
+          [disabled]="currentPage === 1"
+          (click)="changePage(currentPage - 1)">
+          Previous
+        </button>
+
+        @for (page of getPageNumbers(); track page) {
+          <button
+            class="page-btn"
+            type="button"
+            [class.active-page]="page === currentPage"
+            (click)="changePage(page)">
+            {{ page }}
+          </button>
+        }
+
+        <button
+          class="page-btn"
+          type="button"
+          [disabled]="currentPage === totalPages"
+          (click)="changePage(currentPage + 1)">
+          Next
+        </button>
+
+      </div>
+
+    </div>
+
+  </section>
+
+</div>

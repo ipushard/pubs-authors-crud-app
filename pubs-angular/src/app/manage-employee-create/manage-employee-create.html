@@ -1,0 +1,223 @@
+<div class="create-page">
+
+  <header class="page-header">
+    <div>
+      <h1>New User / Employee</h1>
+      <p class="page-subtitle">
+        Create a new employee record and send a registration invitation.
+      </p>
+    </div>
+
+    <button class="btn btn-secondary" type="button" (click)="goBack()">
+      ← Back to Manage Users
+    </button>
+  </header>
+
+  @if (errorMessage) {
+    <div class="message error-message">
+      {{ errorMessage }}
+    </div>
+  }
+
+  @if (successMessage) {
+    <div class="message success-message">
+      {{ successMessage }}
+
+      @if (inviteLink) {
+        <div class="invite-link-box">
+          <strong>Invite link:</strong>
+          <p>{{ inviteLink }}</p>
+        </div>
+      }
+    </div>
+  }
+
+  <section class="form-card">
+
+    <div class="form-card-header">
+      <h2>Employee Information</h2>
+      <p>
+        The employee will be saved in the employee table. A matching app user account will also be created for login.
+      </p>
+    </div>
+
+    <form class="employee-form" #employeeForm="ngForm" (ngSubmit)="saveEmployee(employeeForm)">
+
+      <div class="form-grid">
+
+        <label>
+          Employee ID
+          <input
+            required
+            type="text"
+            class="form-input"
+            placeholder="AB1234567"
+            maxlength="9"
+            [(ngModel)]="newEmployee.emp_id"
+            name="emp_id"
+            #empId="ngModel">
+
+          <span class="field-hint">
+            9 characters, first 2 must be letters. Example: AB1234567
+          </span>
+
+          @if ((empId.invalid && empId.touched) || (submitted && empId.invalid)) {
+            <span class="field-error">
+              Employee ID is required.
+            </span>
+          }
+        </label>
+
+        <label>
+          Email
+          <input
+            required
+            type="email"
+            class="form-input"
+            placeholder="employee@email.com"
+            [(ngModel)]="newEmployee.email"
+            name="email"
+            #email="ngModel">
+
+          @if ((email.invalid && email.touched) || (submitted && email.invalid)) {
+            <span class="field-error">
+              Email is required.
+            </span>
+          }
+        </label>
+
+        <label>
+          First Name
+          <input
+            required
+            type="text"
+            class="form-input"
+            [(ngModel)]="newEmployee.fname"
+            name="fname"
+            #fname="ngModel">
+
+          @if ((fname.invalid && fname.touched) || (submitted && fname.invalid)) {
+            <span class="field-error">
+              First name is required.
+            </span>
+          }
+        </label>
+
+        <label>
+          Middle Initial
+          <input
+            type="text"
+            class="form-input"
+            maxlength="1"
+            [(ngModel)]="newEmployee.minit"
+            name="minit">
+        </label>
+
+        <label>
+          Last Name
+          <input
+            required
+            type="text"
+            class="form-input"
+            [(ngModel)]="newEmployee.lname"
+            name="lname"
+            #lname="ngModel">
+
+          @if ((lname.invalid && lname.touched) || (submitted && lname.invalid)) {
+            <span class="field-error">
+              Last name is required.
+            </span>
+          }
+        </label>
+
+        <label>
+          Publisher
+          <select
+            required
+            class="form-input"
+            [(ngModel)]="newEmployee.pub_id"
+            name="pub_id"
+            #pubId="ngModel">
+
+            @for (publisher of publishers; track publisher.pub_id) {
+              <option [value]="publisher.pub_id">
+                {{ publisher.pub_name }} ({{ publisher.pub_id }})
+              </option>
+            }
+
+          </select>
+
+          @if ((pubId.invalid && pubId.touched) || (submitted && pubId.invalid)) {
+            <span class="field-error">
+              Publisher is required.
+            </span>
+          }
+        </label>
+
+        <label>
+          Position
+          <select
+            required
+            class="form-input"
+            [(ngModel)]="newEmployee.job_id"
+            name="job_id"
+            (change)="onJobChange()"
+            #jobId="ngModel">
+
+            @for (job of jobs; track job.job_id) {
+              <option [ngValue]="job.job_id">
+                {{ job.job_desc }}
+              </option>
+            }
+
+          </select>
+
+          @if ((jobId.invalid && jobId.touched) || (submitted && jobId.invalid)) {
+            <span class="field-error">
+              Position is required.
+            </span>
+          }
+        </label>
+
+        <label>
+          Job Level
+          <input
+            required
+            type="number"
+            class="form-input"
+            [(ngModel)]="newEmployee.job_lvl"
+            name="job_lvl"
+            #jobLvl="ngModel">
+
+          <span class="field-hint">
+            Level is checked against the selected position range.
+          </span>
+
+          @if ((jobLvl.invalid && jobLvl.touched) || (submitted && jobLvl.invalid)) {
+            <span class="field-error">
+              Job level is required.
+            </span>
+          }
+        </label>
+
+      </div>
+
+      <div class="form-actions">
+        <button class="btn btn-primary" type="submit" [disabled]="isLoading">
+          @if (isLoading) {
+            Sending Invite...
+          } @else {
+            Save Employee & Send Invite
+          }
+        </button>
+
+        <button class="btn btn-secondary" type="button" (click)="goBack()">
+          Cancel
+        </button>
+      </div>
+
+    </form>
+
+  </section>
+
+</div>

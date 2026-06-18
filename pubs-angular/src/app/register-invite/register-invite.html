@@ -1,0 +1,134 @@
+<div class="register-page">
+
+  <mat-card class="register-card">
+
+    <mat-card-header>
+      <mat-card-title>Complete Registration</mat-card-title>
+      <mat-card-subtitle>
+        Create your password to access Pubs Data Management
+      </mat-card-subtitle>
+    </mat-card-header>
+
+    <mat-card-content>
+
+      @if (isLoading) {
+        <div class="message loading-message">
+          Loading invitation...
+        </div>
+      }
+
+      @if (errorMessage) {
+        <div class="message error-message">
+          {{ errorMessage }}
+        </div>
+      }
+
+      @if (successMessage) {
+        <div class="message success-message">
+          {{ successMessage }}
+        </div>
+      }
+
+      @if (inviteInfo && !successMessage) {
+
+        <section class="invite-summary">
+
+          <h2>
+            Welcome,
+            {{ inviteInfo.fname | titlecase }}
+            {{ inviteInfo.lname | titlecase }}
+          </h2>
+
+          <div class="summary-grid">
+
+            <div class="summary-item">
+              <span class="label">Employee ID</span>
+              <span class="value">{{ inviteInfo.emp_id }}</span>
+            </div>
+
+            <div class="summary-item">
+              <span class="label">Email</span>
+              <span class="value">{{ inviteInfo.email }}</span>
+            </div>
+
+            <div class="summary-item">
+              <span class="label">Position</span>
+              <span class="value">{{ inviteInfo.job_desc }}</span>
+            </div>
+
+            <div class="summary-item">
+              <span class="label">Hire Date</span>
+              <span class="value">{{ inviteInfo.hire_date | date:'mediumDate' }}</span>
+            </div>
+
+          </div>
+
+        </section>
+
+        <form
+          class="register-form"
+          #registerForm="ngForm"
+          (ngSubmit)="completeRegistration(registerForm)">
+
+          <mat-form-field appearance="outline">
+            <mat-label>Password</mat-label>
+
+            <input
+              matInput
+              required
+              type="password"
+              minlength="6"
+              [(ngModel)]="password"
+              name="password"
+              #passwordInput="ngModel">
+
+            <mat-hint>Minimum 6 characters</mat-hint>
+
+            @if ((passwordInput.invalid && passwordInput.touched) || (submitted && passwordInput.invalid)) {
+              <mat-error>
+                Password is required.
+              </mat-error>
+            }
+          </mat-form-field>
+
+          <mat-form-field appearance="outline">
+            <mat-label>Confirm Password</mat-label>
+
+            <input
+              matInput
+              required
+              type="password"
+              minlength="6"
+              [(ngModel)]="confirmPassword"
+              name="confirmPassword"
+              #confirmPasswordInput="ngModel">
+
+            @if ((confirmPasswordInput.invalid && confirmPasswordInput.touched) || (submitted && confirmPasswordInput.invalid)) {
+              <mat-error>
+                Confirm password is required.
+              </mat-error>
+            }
+          </mat-form-field>
+
+          <button class="btn btn-primary register-button" type="submit" [disabled]="isSaving">
+            @if (isSaving) {
+              Creating Account...
+            } @else {
+              Complete Registration
+            }
+          </button>
+
+        </form>
+      }
+
+      @if (!isLoading && !inviteInfo && errorMessage) {
+        <button class="btn btn-secondary login-button" type="button" (click)="goToLogin()">
+          Go to Login
+        </button>
+      }
+
+    </mat-card-content>
+
+  </mat-card>
+
+</div>

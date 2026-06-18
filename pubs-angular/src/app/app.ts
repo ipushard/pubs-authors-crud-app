@@ -1,16 +1,28 @@
 import { Component, signal } from '@angular/core';
+import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 
-import { Authors } from './authors/authors';
+import { AuthService } from './services/auth';
 
-import { RouterOutlet } from '@angular/router';
-
-// routing will ahndel authors so we dont need them here in the main app component
 @Component({
   selector: 'app-root',
-  imports: [  RouterOutlet ],
+  imports: [
+    RouterOutlet,
+    RouterLink,
+    RouterLinkActive
+  ],
   templateUrl: './app.html',
   styleUrl: './app.css'
 })
 export class App {
   protected readonly title = signal('pubs-angular');
+
+  constructor(
+    public authService: AuthService,
+    private router: Router
+  ) {}
+
+  logout(): void {
+    this.authService.logout();
+    this.router.navigate(['/login']);
+  }
 }

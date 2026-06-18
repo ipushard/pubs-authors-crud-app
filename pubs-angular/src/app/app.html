@@ -8,17 +8,114 @@
         src="/assets/logogov.png"
         alt="Ontario logo">
 
+      @if (authService.isLoggedIn()) {
+        <div class="user-header">
+
+          <div class="user-info">
+            <span class="user-name">
+              {{ authService.getCurrentUser()?.fname }}
+              {{ authService.getCurrentUser()?.lname }}
+            </span>
+
+            <span class="user-role">
+              {{ authService.getCurrentUser()?.job_desc }}
+            </span>
+          </div>
+
+          <button class="btn btn-secondary header-btn" type="button" (click)="logout()">
+            Logout
+          </button>
+
+        </div>
+      }
+
     </div>
   </header>
 
-  <main class="app-main">
-    <router-outlet></router-outlet>
-  </main>
+  <div class="app-layout">
+
+    @if (authService.isLoggedIn()) {
+      <aside class="app-sidebar">
+
+        <nav class="sidebar-nav">
+
+          <a
+            class="sidebar-link"
+            routerLink="/authors"
+            routerLinkActive="active-sidebar-link">
+            <span class="sidebar-icon">▦</span>
+            <span>Authors</span>
+          </a>
+
+          @if (authService.isAdmin()) {
+            <a
+              class="sidebar-link"
+              routerLink="/manage-employees"
+              routerLinkActive="active-sidebar-link">
+              <span class="sidebar-icon">👥</span>
+              <span>Manage Users</span>
+            </a>
+          }
+
+          @if (authService.isManagement()) {
+            <a
+              class="sidebar-link"
+              routerLink="/employees"
+              routerLinkActive="active-sidebar-link">
+              <span class="sidebar-icon">🧑</span>
+              <span>Employees</span>
+            </a>
+
+            <a
+              class="sidebar-link"
+              routerLink="/jobs"
+              routerLinkActive="active-sidebar-link">
+              <span class="sidebar-icon">⚙</span>
+              <span>Jobs</span>
+            </a>
+          }
+
+          <a
+            class="sidebar-link"
+            routerLink="/publishers"
+            routerLinkActive="active-sidebar-link">
+            <span class="sidebar-icon">🏢</span>
+            <span>Publishers</span>
+          </a>
+
+          <a
+            class="sidebar-link"
+            routerLink="/titles"
+            routerLinkActive="active-sidebar-link">
+            <span class="sidebar-icon">📚</span>
+            <span>Titles</span>
+          </a>
+
+          @if (authService.canViewSales()) {
+            <a
+              class="sidebar-link"
+              routerLink="/sales"
+              routerLinkActive="active-sidebar-link">
+              <span class="sidebar-icon">🛒</span>
+              <span>Sales</span>
+            </a>
+          }
+
+        </nav>
+
+      </aside>
+    }
+
+    <main class="app-main">
+      <router-outlet></router-outlet>
+    </main>
+
+  </div>
 
   <footer class="app-footer">
     <div class="app-footer-content">
       <p>
-        Assignment - Service Ontario Authors App
+        Assignment - Pubs Data Management
       </p>
     </div>
   </footer>
