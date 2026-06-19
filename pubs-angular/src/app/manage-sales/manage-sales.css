@@ -6,7 +6,6 @@
   color: #1a1a1a;
 }
 
-/* ServiceOntario-style black header area */
 .page-header {
   background-color: #1a1a1a;
   color: #ffffff;
@@ -30,16 +29,8 @@
   font-size: 15px;
 }
 
-
-
-
-
-
-
-/* dashboard cards */
 .dashboard-grid {
   margin: 20px 0;
-
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 14px;
@@ -50,11 +41,9 @@
   border: 1px solid #d6d6d6;
   border-left: 6px solid #0066cc;
   padding: 14px 16px;
-
   display: flex;
   flex-direction: column;
   gap: 4px;
-
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
 }
 
@@ -88,12 +77,6 @@
   line-height: 1.2 !important;
 }
 
-
-
-
-
-
-
 .message {
   padding: 12px 16px;
   margin: 18px 0;
@@ -119,13 +102,6 @@
   border: 1px solid #0066cc;
 }
 
-
-
-
-
-
-
-/* create and edit sale form */
 .form-card {
   background-color: #ffffff;
   border: 1px solid #d6d6d6;
@@ -147,7 +123,7 @@
 
 .form-grid {
   display: grid;
-  grid-template-columns: 1.4fr 1.2fr 1fr 0.7fr 1fr;
+  grid-template-columns: 1.4fr 1.1fr 1fr 1fr;
   gap: 16px;
 }
 
@@ -162,13 +138,90 @@
   grid-column: span 2;
 }
 
+.line-items-card {
+  margin-top: 20px;
+  border: 1px solid #d6d6d6;
+  background-color: #fafafa;
+  padding: 16px;
+}
+
+.line-items-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  border-bottom: 1px solid #d6d6d6;
+  padding-bottom: 14px;
+  margin-bottom: 14px;
+}
+
+.line-items-header h3 {
+  margin: 0;
+  font-size: 20px;
+  color: #1a1a1a;
+}
+
+.line-items-header p {
+  margin: 4px 0 0 0;
+  color: #555555;
+  font-size: 14px;
+}
+
+.line-items-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.line-item-row {
+  display: grid;
+  grid-template-columns: 2fr 0.7fr 0.9fr auto;
+  gap: 12px;
+  align-items: end;
+  background-color: #ffffff;
+  border: 1px solid #d6d6d6;
+  padding: 14px;
+}
+
+.line-item-row label {
+  display: flex;
+  flex-direction: column;
+  font-weight: 700;
+  color: #333333;
+}
+
+.line-title-field {
+  min-width: 260px;
+}
+
+.line-estimate {
+  background-color: #f3fbf6;
+  border: 1px solid #c7e8d1;
+  border-left: 5px solid #137333;
+  padding: 10px 12px;
+  min-height: 61px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.line-estimate span {
+  font-size: 12px;
+  color: #555555;
+  font-weight: 700;
+}
+
+.line-estimate strong {
+  color: #137333;
+  font-size: 18px;
+}
+
 .estimated-box {
   margin-top: 18px;
   background-color: #f7fbff;
   border: 1px solid #b8d7ff;
   border-left: 6px solid #137333;
   padding: 14px 16px;
-
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -196,12 +249,6 @@
   gap: 12px;
   margin-top: 18px;
 }
-
-
-
-
-
-
 
 .filter-card {
   background-color: #ffffff;
@@ -297,13 +344,6 @@
   cursor: not-allowed;
 }
 
-
-
-
-
-
-
-/* fancy sale summary card */
 .summary-card {
   background-color: #ffffff;
   border: 1px solid #d6d6d6;
@@ -394,11 +434,13 @@
   font-size: 22px;
 }
 
+.details-actions,
 .summary-actions {
   display: flex;
   justify-content: flex-end;
   gap: 12px;
   margin-top: 18px;
+  flex-wrap: wrap;
 }
 
 .email-panel {
@@ -422,26 +464,28 @@
   margin-top: 14px;
 }
 
+.line-detail-table-wrap {
+  margin-top: 18px;
+  overflow-x: auto;
+  border: 1px solid #d6d6d6;
+}
 
-
-
-
-
-
-/* Table container */
 .table-card {
   background-color: #ffffff;
   border: 1px solid #d6d6d6;
   overflow-x: auto;
 }
 
-/* Table */
 .sales-table {
   width: 100%;
   border-collapse: collapse;
   background-color: #ffffff;
   color: #1a1a1a;
-  min-width: 1250px;
+  min-width: 1150px;
+}
+
+.line-detail-table-wrap .sales-table {
+  min-width: 900px;
 }
 
 .sales-table th {
@@ -476,21 +520,19 @@
   color: #137333;
 }
 
-/* actions column */
 .sales-table th:last-child,
 .sales-table td:last-child {
   text-align: center;
-  width: 240px;
-  min-width: 240px;
+  width: 360px;
+  min-width: 360px;
 }
 
+.line-detail-table-wrap .sales-table th:last-child,
+.line-detail-table-wrap .sales-table td:last-child {
+  width: 220px;
+  min-width: 220px;
+}
 
-
-
-
-
-
-/* empty state */
 .empty-state {
   padding: 30px 20px;
   text-align: center;
@@ -515,13 +557,6 @@
   font-weight: 700;
 }
 
-
-
-
-
-
-
-/* Buttons */
 .btn {
   border: 2px solid transparent;
   border-radius: 4px;
@@ -564,28 +599,23 @@
   border-color: #a80000;
 }
 
-.btn-danger:disabled {
+.btn:disabled,
+.btn-danger:disabled,
+.btn-edit:disabled,
+.btn-summary:disabled {
   border-color: #cccccc;
   color: #777777;
   background-color: #eeeeee;
+  box-shadow: none;
   cursor: not-allowed;
 }
 
-.btn:disabled {
-  border-color: #cccccc;
-  color: #777777;
-  background-color: #eeeeee;
-  cursor: not-allowed;
-}
-
-/* smaller button used inside table rows */
 .btn-small {
   padding: 7px 10px;
   font-size: 12px;
   border-radius: 4px;
 }
 
-/* summary button */
 .btn-summary {
   background-color: #ffffff;
   color: #137333;
@@ -598,7 +628,6 @@
   box-shadow: 0 4px 10px rgba(19, 115, 51, 0.22);
 }
 
-/* edit button inside actions column */
 .btn-edit {
   background-color: #ffffff;
   color: #0066cc;
@@ -611,35 +640,18 @@
   box-shadow: 0 4px 10px rgba(0, 102, 204, 0.22);
 }
 
-.btn-edit:disabled,
-.btn-summary:disabled {
-  border-color: #cccccc;
-  color: #777777;
-  background-color: #eeeeee;
-  box-shadow: none;
-  cursor: not-allowed;
-}
-
 .action-buttons {
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 6px;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
 }
 
-
-
-
-
-
-
-/* Pagination area under the table */
 .pagination-bar {
   border-top: 1px solid #d6d6d6;
   background-color: #fafafa;
   padding: 14px 16px;
-
   display: grid;
   grid-template-columns: 1fr auto auto;
   align-items: center;
@@ -716,13 +728,6 @@
   border-color: #004f9e;
 }
 
-
-
-
-
-
-
-/* Mobile-friendly */
 @media (max-width: 1100px) {
   .form-grid {
     grid-template-columns: 1fr 1fr;
@@ -730,6 +735,14 @@
 
   .title-field {
     grid-column: span 2;
+  }
+
+  .line-item-row {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .line-title-field {
+    min-width: auto;
   }
 
   .filter-grid {
@@ -748,7 +761,8 @@
 @media (max-width: 900px) {
   .filter-grid,
   .form-grid,
-  .summary-grid {
+  .summary-grid,
+  .line-item-row {
     grid-template-columns: 1fr;
   }
 
@@ -758,7 +772,8 @@
     grid-column: span 1;
   }
 
-  .filter-header {
+  .filter-header,
+  .line-items-header {
     flex-direction: column;
     align-items: flex-start;
   }
@@ -799,6 +814,7 @@
 
   .form-actions,
   .summary-actions,
+  .details-actions,
   .email-actions {
     justify-content: flex-start;
     flex-wrap: wrap;

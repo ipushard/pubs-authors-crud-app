@@ -11,6 +11,11 @@ import {
   SaleEmailResponse,
   SaleUpdateRequest,
   SaleUpdateResponse,
+  SalesOrder,
+  SalesOrderCreateRequest,
+  SalesOrderCreateResponse,
+  SalesOrderDeleteResponse,
+  SalesOrderDetails,
   SalesStore,
   SalesTitle
 } from '../models/admin-sale';
@@ -28,6 +33,19 @@ export class AdminSaleService {
     return this.http.get<AdminSale[]>(this.apiUrl);
   }
 
+  getOrders(): Observable<SalesOrder[]> {
+    return this.http.get<SalesOrder[]>(`${this.apiUrl}/orders`);
+  }
+
+  getOrderDetails(
+    storeId: string,
+    orderNumber: string
+  ): Observable<SalesOrderDetails> {
+    return this.http.get<SalesOrderDetails>(
+      `${this.apiUrl}/orders/${storeId}/${encodeURIComponent(orderNumber)}`
+    );
+  }
+
   getStores(): Observable<SalesStore[]> {
     return this.http.get<SalesStore[]>(`${this.apiUrl}/stores`);
   }
@@ -38,6 +56,10 @@ export class AdminSaleService {
 
   createSale(sale: SaleCreateRequest): Observable<SaleCreateResponse> {
     return this.http.post<SaleCreateResponse>(this.apiUrl, sale);
+  }
+
+  createOrder(order: SalesOrderCreateRequest): Observable<SalesOrderCreateResponse> {
+    return this.http.post<SalesOrderCreateResponse>(`${this.apiUrl}/orders`, order);
   }
 
   updateSale(
@@ -59,6 +81,15 @@ export class AdminSaleService {
   ): Observable<SaleDeleteResponse> {
     return this.http.delete<SaleDeleteResponse>(
       `${this.apiUrl}/${storeId}/${encodeURIComponent(orderNumber)}/${titleId}`
+    );
+  }
+
+  deleteOrder(
+    storeId: string,
+    orderNumber: string
+  ): Observable<SalesOrderDeleteResponse> {
+    return this.http.delete<SalesOrderDeleteResponse>(
+      `${this.apiUrl}/orders/${storeId}/${encodeURIComponent(orderNumber)}`
     );
   }
 

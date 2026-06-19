@@ -4,19 +4,19 @@
     <div>
       <h1>Sales Management</h1>
       <p class="page-subtitle">
-        Sensitive sales area for reporting, editing, exporting, and emailing sale summaries.
+        Sensitive sales area for orders, items, reporting, exporting, and emailing sale summaries.
       </p>
     </div>
 
     <button class="btn btn-primary" type="button" (click)="openCreateForm()">
-      + New Sale
+      + New Order
     </button>
   </header>
 
   <section class="dashboard-grid">
 
     <div class="dashboard-card">
-      <span class="dashboard-label">Sales Records</span>
+      <span class="dashboard-label">Sales Orders</span>
       <strong>{{ totalSalesRecords }}</strong>
       <span class="dashboard-note">total orders</span>
     </div>
@@ -28,7 +28,7 @@
     </div>
 
     <div class="dashboard-card dashboard-card-green">
-      <span class="dashboard-label">Estimated Revenue</span>
+      <span class="dashboard-label">Total Amount</span>
       <strong>{{ totalEstimatedRevenue | currency:'USD':'symbol':'1.2-2' }}</strong>
       <span class="dashboard-note">price × quantity</span>
     </div>
@@ -55,7 +55,7 @@
 
   @if (isLoading) {
     <div class="message loading-message">
-      Loading sales from database...
+      Loading sales orders from database...
     </div>
   }
 
@@ -70,14 +70,14 @@
 
       <div class="form-header">
         @if (isEditMode) {
-          <h2>Edit Sale</h2>
+          <h2>Edit Order Item</h2>
           <p>
-            Store, order number, and title are locked because the Pubs sales table uses them as the sale key.
+            Store, order number, and title are locked because the Pubs sales table uses them as the order item key.
           </p>
         } @else {
-          <h2>Create New Sale</h2>
+          <h2>Create Sales Order</h2>
           <p>
-            Add a new sale record and automatically calculate estimated revenue.
+            Create one order with one or more title items.
           </p>
         }
       </div>
@@ -88,7 +88,7 @@
           Store
           <select
             class="filter-input"
-            [disabled]="isEditMode"
+            [disabled]="isEditMode || isAddingToExistingOrder"
             [(ngModel)]="formStoreId">
             <option value="">Select Store</option>
 
@@ -107,7 +107,7 @@
             class="filter-input"
             maxlength="20"
             placeholder="Example: ORD9901"
-            [disabled]="isEditMode"
+            [disabled]="isEditMode || isAddingToExistingOrder"
             [(ngModel)]="formOrderNumber">
         </label>
 
@@ -120,17 +120,6 @@
         </label>
 
         <label>
-          Quantity
-          <input
-            type="number"
-            class="filter-input"
-            min="1"
-            step="1"
-            placeholder="1"
-            [(ngModel)]="formQty">
-        </label>
-
-        <label>
           Pay Terms
           <input
             type="text"
@@ -140,29 +129,126 @@
             [(ngModel)]="formPayterms">
         </label>
 
-        <label class="title-field">
-          Title
-          <select
-            class="filter-input"
-            [disabled]="isEditMode"
-            [(ngModel)]="formTitleId">
-            <option value="">Select Title</option>
-
-            @for (title of titles; track title.title_id) {
-              <option [value]="title.title_id">
-                {{ title.title }} - {{ title.pub_name || title.pub_id }} ({{ title.title_id }})
-              </option>
-            }
-          </select>
-        </label>
-
       </div>
 
+      @if (formMode === 'editLine') {
+        <div class="form-grid">
+
+          <label class="title-field">
+            Title
+            <select
+              class="filter-input"
+              disabled
+              [(ngModel)]="formTitleId">
+              <option value="">Select Title</option>
+
+              @for (title of titles; track title.title_id) {
+                <option [value]="title.title_id">
+                  {{ title.title }} - {{ title.pub_name || title.pub_id }} ({{ title.title_id }})
+                </option>
+              }
+            </select>
+          </label>
+
+          <label>
+            Quantity
+            <input
+              type="number"
+              class="filter-input"
+              min="1"
+              step="1"
+              placeholder="1"
+              [(ngModel)]="formQty">
+          </label>
+
+        </div>
+      }
+
+      @if (formMode === 'createOrder') {
+        <div class="line-items-card">
+
+          <div class="line-items-header">
+            <div>
+              <h3>Order Items</h3>
+              <p>
+                Add each title that belongs to this order.
+              </p>
+            </div>
+
+            <button
+              class="btn btn-outline"
+              type="button"
+              [disabled]="isSaving"
+              (click)="addFormLine()">
+              + Add Title Item
+            </button>
+          </div>
+
+          <div class="line-items-list">
+
+            @for (line of formItems; track $index) {
+              <div class="line-item-row">
+
+                <label class="line-title-field">
+                  Title
+                  <select
+                    class="filter-input"
+                    [(ngModel)]="line.title_id">
+                    <option value="">Select Title</option>
+
+                    @for (title of titles; track title.title_id) {
+                      <option [value]="title.title_id">
+                        {{ title.title }} - {{ title.pub_name || title.pub_id }} ({{ title.title_id }})
+                      </option>
+                    }
+                  </select>
+                </label>
+
+                <label>
+                  Quantity
+                  <input
+                    type="number"
+                    class="filter-input"
+                    min="1"
+                    step="1"
+                    placeholder="1"
+                    [(ngModel)]="line.qty">
+                </label>
+
+                <div class="line-estimate">
+                  <span>Item Total</span>
+                  <strong>{{ getFormLineEstimatedRevenue(line) | currency:'USD':'symbol':'1.2-2' }}</strong>
+                </div>
+
+                <button
+                  class="btn btn-small btn-danger"
+                  type="button"
+                  [disabled]="isSaving || formItems.length <= 1"
+                  (click)="removeFormLine($index)">
+                  Remove
+                </button>
+
+              </div>
+            }
+
+          </div>
+
+        </div>
+      }
+
       <div class="estimated-box">
-        <span class="estimated-label">Estimated Revenue</span>
+        <span class="estimated-label">
+          @if (formMode === 'editLine') {
+            Estimated Item Total
+          } @else {
+            Estimated Order Total
+          }
+        </span>
+
         <strong>{{ getFormEstimatedRevenue() | currency:'USD':'symbol':'1.2-2' }}</strong>
+
         <span class="estimated-note">
-          Selected title price × quantity
+          Title price × quantity
         </span>
       </div>
 
@@ -181,9 +267,9 @@
           [disabled]="isSaving"
           (click)="saveSale()">
           @if (isEditMode) {
-            Save Changes
+            Save Item Changes
           } @else {
-            Create Sale
+            Create Order
           }
         </button>
       </div>
@@ -194,7 +280,7 @@
   <section class="filter-card">
 
     <button class="filter-toggle" type="button" (click)="toggleFilters()">
-      <span>Filter & Sort Sales</span>
+      <span>Filter & Sort Sales Orders</span>
 
       @if (showFilters) {
         <span class="filter-arrow">▲</span>
@@ -219,7 +305,7 @@
             <input
               type="text"
               class="filter-input"
-              placeholder="Search by order, store, title, publisher, city, pay terms, quantity, or revenue"
+              placeholder="Search by order, store, city, pay terms, quantity, or total amount"
               [(ngModel)]="searchTerm"
               (input)="clearSuccessMessage(); applyFiltersAndSort()">
           </label>
@@ -302,12 +388,10 @@
               <option value="orderDesc">Order Number Z-A</option>
               <option value="storeAsc">Store A-Z</option>
               <option value="storeDesc">Store Z-A</option>
-              <option value="titleAsc">Title A-Z</option>
-              <option value="titleDesc">Title Z-A</option>
               <option value="qtyHigh">Quantity High-Low</option>
               <option value="qtyLow">Quantity Low-High</option>
-              <option value="revenueHigh">Revenue High-Low</option>
-              <option value="revenueLow">Revenue Low-High</option>
+              <option value="revenueHigh">Total Amount High-Low</option>
+              <option value="revenueLow">Total Amount Low-High</option>
             </select>
           </label>
 
@@ -317,15 +401,165 @@
 
   </section>
 
-  @if (showSummaryPanel) {
-    @if (selectedSaleForSummary; as sale) {
+  @if (showOrderDetailsPanel) {
+    @if (selectedOrderDetails; as order) {
       <section class="summary-card">
 
         <div class="summary-header">
           <div>
-            <h2>Sale Summary</h2>
+            <h2>Order Items</h2>
             <p>
-              Order {{ sale.ord_num }} • {{ sale.stor_name || sale.stor_id }}
+              Order {{ order.ord_num }} • {{ order.stor_name || order.stor_id }}
+            </p>
+          </div>
+
+          <button class="summary-close" type="button" (click)="closeOrderDetailsPanel()">
+            ×
+          </button>
+        </div>
+
+        <div class="summary-grid">
+
+          <div class="summary-item">
+            <span>Order Number</span>
+            <strong>{{ order.ord_num }}</strong>
+          </div>
+
+          <div class="summary-item">
+            <span>Order Date</span>
+            <strong>{{ formatDateForDisplay(order.ord_date) }}</strong>
+          </div>
+
+          <div class="summary-item">
+            <span>Store</span>
+            <strong>{{ order.stor_name || order.stor_id }}</strong>
+          </div>
+
+          <div class="summary-item">
+            <span>Store Location</span>
+            <strong>{{ getOrderLocation(order) }}</strong>
+          </div>
+
+          <div class="summary-item">
+            <span>Items</span>
+            <strong>{{ order.line_count }}</strong>
+          </div>
+
+          <div class="summary-item">
+            <span>Total Quantity</span>
+            <strong>{{ order.total_qty }}</strong>
+          </div>
+
+          <div class="summary-item">
+            <span>Pay Terms</span>
+            <strong>{{ order.payterms }}</strong>
+          </div>
+
+          <div class="summary-item summary-revenue">
+            <span>Total Amount</span>
+            <strong>{{ getOrderDetailsRevenue(order) | currency:'USD':'symbol':'1.2-2' }}</strong>
+          </div>
+
+        </div>
+
+        <div class="details-actions">
+          <button
+            class="btn btn-outline"
+            type="button"
+            [disabled]="isSaving"
+            (click)="openAddLineToOrder(order)">
+            + Add Item To This Order
+          </button>
+
+          <button
+            class="btn btn-primary"
+            type="button"
+            [disabled]="isSaving"
+            (click)="openSummaryPanel(order)">
+            Open Summary
+          </button>
+        </div>
+
+        <div class="line-detail-table-wrap">
+          <table class="sales-table">
+            <thead>
+              <tr>
+                <th>Title</th>
+                <th>Publisher</th>
+                <th>Type</th>
+                <th>Unit Price</th>
+                <th>Qty</th>
+                <th>Item Total</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+
+            <tbody>
+              @for (line of order.lines; track line.stor_id + line.ord_num + line.title_id) {
+                <tr>
+                  <td>
+                    <strong>{{ line.title || line.title_id }}</strong>
+                    <span class="sub-text">{{ line.title_id }}</span>
+                  </td>
+
+                  <td>{{ line.pub_name || '-' }}</td>
+
+                  <td>{{ line.type || '-' }}</td>
+
+                  <td>{{ line.price | currency:'USD':'symbol':'1.2-2' }}</td>
+
+                  <td>{{ line.qty }}</td>
+
+                  <td>
+                    <strong class="revenue-text">
+                      {{ getSaleRevenue(line) | currency:'USD':'symbol':'1.2-2' }}
+                    </strong>
+                  </td>
+
+                  <td>
+                    <div class="action-buttons">
+                      <button
+                        class="btn btn-small btn-edit"
+                        type="button"
+                        [disabled]="isSaving"
+                        (click)="openEditForm(line)">
+                        Edit Item
+                      </button>
+
+                      <button
+                        class="btn btn-small btn-danger"
+                        type="button"
+                        [disabled]="isSaving"
+                        (click)="deleteSale(line)">
+                        Delete Item
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              } @empty {
+                <tr>
+                  <td colspan="7" class="empty-row">
+                    No items found for this order.
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+
+      </section>
+    }
+  }
+
+  @if (showSummaryPanel) {
+    @if (selectedOrderForSummary; as order) {
+      <section class="summary-card">
+
+        <div class="summary-header">
+          <div>
+            <h2>Sales Order Summary</h2>
+            <p>
+              Order {{ order.ord_num }} • {{ order.stor_name || order.stor_id }}
             </p>
           </div>
 
@@ -338,54 +572,90 @@
 
           <div class="summary-item">
             <span>Order Number</span>
-            <strong>{{ sale.ord_num }}</strong>
+            <strong>{{ order.ord_num }}</strong>
           </div>
 
           <div class="summary-item">
             <span>Order Date</span>
-            <strong>{{ sale.ord_date | date:'mediumDate' }}</strong>
+            <strong>{{ formatDateForDisplay(order.ord_date) }}</strong>
           </div>
 
           <div class="summary-item">
             <span>Store</span>
-            <strong>{{ sale.stor_name || sale.stor_id }}</strong>
+            <strong>{{ order.stor_name || order.stor_id }}</strong>
           </div>
 
           <div class="summary-item">
             <span>Store Location</span>
-            <strong>{{ getStoreLocation(sale) }}</strong>
-          </div>
-
-          <div class="summary-item summary-wide">
-            <span>Title</span>
-            <strong>{{ sale.title || sale.title_id }}</strong>
+            <strong>{{ getOrderLocation(order) }}</strong>
           </div>
 
           <div class="summary-item">
-            <span>Publisher</span>
-            <strong>{{ sale.pub_name || 'N/A' }}</strong>
+            <span>Items</span>
+            <strong>{{ order.line_count }}</strong>
           </div>
 
           <div class="summary-item">
-            <span>Quantity</span>
-            <strong>{{ sale.qty }}</strong>
+            <span>Total Quantity</span>
+            <strong>{{ order.total_qty }}</strong>
           </div>
 
           <div class="summary-item">
             <span>Pay Terms</span>
-            <strong>{{ sale.payterms }}</strong>
-          </div>
-
-          <div class="summary-item">
-            <span>Unit Price</span>
-            <strong>{{ sale.price | currency:'USD':'symbol':'1.2-2' }}</strong>
+            <strong>{{ order.payterms }}</strong>
           </div>
 
           <div class="summary-item summary-revenue">
-            <span>Estimated Revenue</span>
-            <strong>{{ getSaleRevenue(sale) | currency:'USD':'symbol':'1.2-2' }}</strong>
+            <span>Total Amount</span>
+            <strong>{{ getOrderDetailsRevenue(order) | currency:'USD':'symbol':'1.2-2' }}</strong>
           </div>
 
+        </div>
+
+        <div class="line-detail-table-wrap">
+          <table class="sales-table">
+            <thead>
+              <tr>
+                <th>Title</th>
+                <th>Publisher</th>
+                <th>Type</th>
+                <th>Unit Price</th>
+                <th>Qty</th>
+                <th>Item Total</th>
+              </tr>
+            </thead>
+
+            <tbody>
+              @for (line of order.lines; track line.stor_id + line.ord_num + line.title_id) {
+                <tr>
+                  <td>
+                    <strong>{{ line.title || line.title_id }}</strong>
+                    <span class="sub-text">{{ line.title_id }}</span>
+                  </td>
+
+                  <td>{{ line.pub_name || '-' }}</td>
+
+                  <td>{{ line.type || '-' }}</td>
+
+                  <td>{{ line.price | currency:'USD':'symbol':'1.2-2' }}</td>
+
+                  <td>{{ line.qty }}</td>
+
+                  <td>
+                    <strong class="revenue-text">
+                      {{ getSaleRevenue(line) | currency:'USD':'symbol':'1.2-2' }}
+                    </strong>
+                  </td>
+                </tr>
+              } @empty {
+                <tr>
+                  <td colspan="6" class="empty-row">
+                    No items found for this order.
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
         </div>
 
         <div class="summary-actions">
@@ -435,9 +705,9 @@
 
   <section class="table-card">
 
-    @if (!isLoading && filteredSales.length === 0) {
+    @if (!isLoading && filteredOrders.length === 0) {
       <div class="empty-state">
-        <h3>No sales found</h3>
+        <h3>No sales orders found</h3>
         <p>
           Try changing your search, filters, date range, or sort option.
         </p>
@@ -450,43 +720,45 @@
           <th>Order</th>
           <th>Date</th>
           <th>Store</th>
-          <th>Title</th>
-          <th>Publisher</th>
-          <th>Qty</th>
+          <th>Items</th>
+          <th>Total Qty</th>
           <th>Pay Terms</th>
-          <th>Revenue</th>
+          <th>Total Amount</th>
           <th>Actions</th>
         </tr>
       </thead>
 
       <tbody>
-        @for (sale of pagedSales; track sale.stor_id + sale.ord_num + sale.title_id) {
+        @for (order of pagedOrders; track order.stor_id + order.ord_num) {
           <tr>
-            <td>{{ sale.ord_num }}</td>
-            <td>{{ sale.ord_date | date:'mediumDate' }}</td>
+            <td>{{ order.ord_num }}</td>
+
+            <td>{{ formatDateForDisplay(order.ord_date) }}</td>
+
             <td>
-              <strong>{{ sale.stor_name || sale.stor_id }}</strong>
-              <span class="sub-text">{{ getStoreLocation(sale) }}</span>
+              <strong>{{ order.stor_name || order.stor_id }}</strong>
+              <span class="sub-text">{{ getOrderLocation(order) }}</span>
             </td>
-            <td>
-              <strong>{{ sale.title || sale.title_id }}</strong>
-              <span class="sub-text">{{ sale.title_id }}</span>
-            </td>
-            <td>{{ sale.pub_name || '-' }}</td>
-            <td>{{ sale.qty }}</td>
-            <td>{{ sale.payterms }}</td>
+
+            <td>{{ order.line_count }}</td>
+
+            <td>{{ order.total_qty }}</td>
+
+            <td>{{ order.payterms }}</td>
+
             <td>
               <strong class="revenue-text">
-                {{ getSaleRevenue(sale) | currency:'USD':'symbol':'1.2-2' }}
+                {{ getOrderRevenue(order) | currency:'USD':'symbol':'1.2-2' }}
               </strong>
             </td>
+
             <td>
               <div class="action-buttons">
                 <button
                   class="btn btn-small btn-summary"
                   type="button"
                   [disabled]="isSaving"
-                  (click)="openSummaryPanel(sale)">
+                  (click)="openSummaryPanel(order)">
                   Summary
                 </button>
 
@@ -494,24 +766,32 @@
                   class="btn btn-small btn-edit"
                   type="button"
                   [disabled]="isSaving"
-                  (click)="openEditForm(sale)">
-                  Edit
+                  (click)="openOrderDetails(order)">
+                  View Items
+                </button>
+
+                <button
+                  class="btn btn-small btn-outline"
+                  type="button"
+                  [disabled]="isSaving"
+                  (click)="openAddLineToOrder(order)">
+                  Add Item
                 </button>
 
                 <button
                   class="btn btn-small btn-danger"
                   type="button"
                   [disabled]="isSaving"
-                  (click)="deleteSale(sale)">
-                  Delete
+                  (click)="deleteOrder(order)">
+                  Delete Order
                 </button>
               </div>
             </td>
           </tr>
         } @empty {
           <tr>
-            <td colspan="9" class="empty-row">
-              No sales match the current search or filters.
+            <td colspan="8" class="empty-row">
+              No sales orders match the current search or filters.
             </td>
           </tr>
         }
@@ -526,13 +806,13 @@
         -
         <strong>{{ getEndRecordNumber() }}</strong>
         of
-        <strong>{{ filteredSales.length }}</strong>
-        records
+        <strong>{{ filteredOrders.length }}</strong>
+        orders
       </div>
 
       <div class="page-size-control">
         <label>
-          Records per page
+          Orders per page
           <select
             class="page-size-select"
             [(ngModel)]="pageSize"
