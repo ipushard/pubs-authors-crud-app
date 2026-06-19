@@ -2347,10 +2347,12 @@ app.delete('/api/admin/titles/:title_id', authenticateToken, requireAdmin, async
 // sales page is sensitive
 // these routes are used for viewing, creating, editing, deleting, and reporting sales
 // sales use a composite key in the Pubs database: stor_id + ord_num + title_id
+// one order can have multiple title line items when stor_id + ord_num are the same
 
 
 
 // GET SALES FOR SALES MANAGEMENT PAGE
+// this returns individual sales rows
 app.get('/api/sales', authenticateToken, requireSalesAccess, async (req, res) => {
     try {
         const pool = await sql.connect(dbConfig);
@@ -2380,7 +2382,7 @@ app.get('/api/sales', authenticateToken, requireSalesAccess, async (req, res) =>
             LEFT JOIN stores st ON s.stor_id = st.stor_id
             LEFT JOIN titles t ON s.title_id = t.title_id
             LEFT JOIN publishers p ON t.pub_id = p.pub_id
-            ORDER BY s.ord_date DESC, s.ord_num
+            ORDER BY s.ord_date DESC, s.ord_num, s.stor_id, s.title_id
         `);
 
         res.json(result.recordset);
@@ -2389,6 +2391,145 @@ app.get('/api/sales', authenticateToken, requireSalesAccess, async (req, res) =>
 
         res.status(500).json({
             message: 'Error getting sales.',
+            error: err.message
+        });
+    }
+});
+
+
+
+// GET GROUPED SALES ORDERS
+// this returns one row per order
+// orders are grouped by stor_id + ord_num
+app.get('/api/sales/orders', authenticateToken, requireSalesAccess, async (req, res) => {
+    try {
+        const pool = await sql.connect(dbConfig);
+
+        const result = await pool.request().query(`
+            SELECT
+                s.stor_id,
+                s.ord_num,
+                MIN(s.ord_date) AS ord_date,
+                MAX(s.payterms) AS payterms,
+
+                st.stor_name,
+                st.city AS store_city,
+                st.state AS store_state,
+
+                COUNT(*) AS line_count,
+                SUM(ISNULL(s.qty, 0)) AS total_qty,
+                CAST(SUM(ISNULL(t.price, 0) * ISNULL(s.qty, 0)) AS money) AS order_total
+            FROM sales s
+            LEFT JOIN stores st ON s.stor_id = st.stor_id
+            LEFT JOIN titles t ON s.title_id = t.title_id
+            GROUP BY
+                s.stor_id,
+                s.ord_num,
+                st.stor_name,
+                st.city,
+                st.state
+            ORDER BY MIN(s.ord_date) DESC, s.ord_num
+        `);
+
+        res.json(result.recordset);
+    } catch (err) {
+        console.error('Get grouped sales orders error:', err);
+
+        res.status(500).json({
+            message: 'Error getting grouped sales orders.',
+            error: err.message
+        });
+    }
+});
+
+
+
+// GET FULL ORDER DETAILS
+// this returns one order with all title line items
+app.get('/api/sales/orders/:stor_id/:ord_num', authenticateToken, requireSalesAccess, async (req, res) => {
+    try {
+        const cleanStoreId = String(req.params.stor_id || '').trim();
+        const cleanOrderNumber = String(req.params.ord_num || '').trim();
+
+        if (!cleanStoreId || !cleanOrderNumber) {
+            return res.status(400).json({
+                message: 'Store ID and order number are required.'
+            });
+        }
+
+        const pool = await sql.connect(dbConfig);
+
+        const result = await pool.request()
+            .input('stor_id', sql.Char(4), cleanStoreId)
+            .input('ord_num', sql.VarChar(20), cleanOrderNumber)
+            .query(`
+                SELECT
+                    s.stor_id,
+                    s.ord_num,
+                    s.ord_date,
+                    s.qty,
+                    s.payterms,
+                    s.title_id,
+
+                    st.stor_name,
+                    st.city AS store_city,
+                    st.state AS store_state,
+
+                    t.title,
+                    t.type,
+                    t.price,
+                    t.pub_id,
+
+                    p.pub_name,
+
+                    CAST(ISNULL(t.price, 0) * ISNULL(s.qty, 0) AS money) AS estimated_revenue
+                FROM sales s
+                LEFT JOIN stores st ON s.stor_id = st.stor_id
+                LEFT JOIN titles t ON s.title_id = t.title_id
+                LEFT JOIN publishers p ON t.pub_id = p.pub_id
+                WHERE s.stor_id = @stor_id
+                AND s.ord_num = @ord_num
+                ORDER BY s.title_id
+            `);
+
+        if (result.recordset.length === 0) {
+            return res.status(404).json({
+                message: 'Order not found.'
+            });
+        }
+
+        const firstLine = result.recordset[0];
+
+        const orderTotal = result.recordset.reduce((total, item) => {
+            return total + Number(item.estimated_revenue || 0);
+        }, 0);
+
+        const totalQty = result.recordset.reduce((total, item) => {
+            return total + Number(item.qty || 0);
+        }, 0);
+
+        res.json({
+            stor_id: firstLine.stor_id,
+            ord_num: firstLine.ord_num,
+            ord_date: firstLine.ord_date,
+            payterms: firstLine.payterms,
+
+            stor_name: firstLine.stor_name,
+            store_city: firstLine.store_city,
+            store_state: firstLine.store_state,
+
+            line_count: result.recordset.length,
+            total_qty: totalQty,
+            order_total: orderTotal,
+
+            lines: result.recordset
+        });
+
+    } catch (err) {
+        console.error('Get full sales order error:', err);
+
+        res.status(500).json({
+            message: 'Error getting full sales order.',
             error: err.message
         });
     }
@@ -2426,7 +2567,39 @@ app.get('/api/sales/stores', authenticateToken, requireSalesAccess, async (req, 
 
 
 
-// CREATE NEW SALE
+// GET TITLES FOR SALES FORM
+app.get('/api/sales/titles', authenticateToken, requireSalesAccess, async (req, res) => {
+    try {
+        const pool = await sql.connect(dbConfig);
+
+        const result = await pool.request().query(`
+            SELECT
+                t.title_id,
+                t.title,
+                t.type,
+                t.pub_id,
+                t.price,
+                p.pub_name
+            FROM titles t
+            LEFT JOIN publishers p ON t.pub_id = p.pub_id
+            ORDER BY t.title
+        `);
+
+        res.json(result.recordset);
+    } catch (err) {
+        console.error('Get sales titles error:', err);
+
+        res.status(500).json({
+            message: 'Error getting titles.',
+            error: err.message
+        });
+    }
+});
+
+
+
+// CREATE NEW SALE LINE
+// this creates one title line inside an order
 app.post('/api/sales', authenticateToken, requireSalesAccess, async (req, res) => {
     try {
         const {
@@ -2444,10 +2617,10 @@ app.post('/api/sales', authenticateToken, requireSalesAccess, async (req, res) =
             });
         }
 
-        const cleanStoreId = stor_id.trim();
-        const cleanOrderNumber = ord_num.trim();
-        const cleanPayTerms = payterms.trim();
-        const cleanTitleId = title_id.trim().toUpperCase();
+        const cleanStoreId = String(stor_id).trim();
+        const cleanOrderNumber = String(ord_num).trim();
+        const cleanPayTerms = String(payterms).trim();
+        const cleanTitleId = String(title_id).trim().toUpperCase();
 
         const parsedOrderDate = new Date(ord_date);
         const parsedQty = Number(qty);
@@ -2490,7 +2663,6 @@ app.post('/api/sales', authenticateToken, requireSalesAccess, async (req, res) =
 
         const pool = await sql.connect(dbConfig);
 
-        // check selected store exists
         const storeCheck = await pool.request()
             .input('stor_id', sql.Char(4), cleanStoreId)
             .query(`
@@ -2505,7 +2677,6 @@ app.post('/api/sales', authenticateToken, requireSalesAccess, async (req, res) =
             });
         }
 
-        // check selected title exists
         const titleCheck = await pool.request()
             .input('title_id', sql.VarChar(6), cleanTitleId)
             .query(`
@@ -2520,7 +2691,6 @@ app.post('/api/sales', authenticateToken, requireSalesAccess, async (req, res) =
             });
         }
 
-        // check duplicate sale composite key
         const duplicateCheck = await pool.request()
             .input('stor_id', sql.Char(4), cleanStoreId)
             .input('ord_num', sql.VarChar(20), cleanOrderNumber)
@@ -2538,7 +2708,7 @@ app.post('/api/sales', authenticateToken, requireSalesAccess, async (req, res) =
 
         if (duplicateCheck.recordset.length > 0) {
             return res.status(409).json({
-                message: 'This sale already exists for the selected store, order number, and title.'
+                message: 'This title already exists in this order. Use a different title or edit the existing line.'
             });
         }
 
@@ -2578,15 +2748,15 @@ app.post('/api/sales', authenticateToken, requireSalesAccess, async (req, res) =
             `);
 
         res.status(201).json({
-            message: 'Sale created successfully.',
+            message: 'Sale line created successfully.',
             sale: result.recordset[0]
         });
 
     } catch (err) {
-        console.error('Create sale error:', err);
+        console.error('Create sale line error:', err);
 
         res.status(500).json({
-            message: 'Error creating sale.',
+            message: 'Error creating sale line.',
             error: err.message
         });
     }
@@ -2594,8 +2764,231 @@ app.post('/api/sales', authenticateToken, requireSalesAccess, async (req, res) =
 
 
 
-// UPDATE EXISTING SALE
-// we keep stor_id, ord_num, and title_id as the original key
+// CREATE FULL ORDER WITH MULTIPLE TITLE LINES
+// expected body:
+// {
+//   stor_id: '7066',
+//   ord_num: 'ORD9989',
+//   ord_date: '2026-06-18',
+//   payterms: 'Net 30',
+//   items: [
+//     { title_id: 'BU1032', qty: 3 },
+//     { title_id: 'PC8888', qty: 2 }
+//   ]
+// }
+app.post('/api/sales/orders', authenticateToken, requireSalesAccess, async (req, res) => {
+    let transaction;
+
+    try {
+        const {
+            stor_id,
+            ord_num,
+            ord_date,
+            payterms,
+            items
+        } = req.body;
+
+        if (!stor_id || !ord_num || !ord_date || !payterms || !Array.isArray(items) || items.length === 0) {
+            return res.status(400).json({
+                message: 'Store, order number, order date, pay terms, and at least one title line are required.'
+            });
+        }
+
+        const cleanStoreId = String(stor_id).trim();
+        const cleanOrderNumber = String(ord_num).trim();
+        const cleanPayTerms = String(payterms).trim();
+        const parsedOrderDate = new Date(ord_date);
+
+        if (cleanStoreId.length !== 4) {
+            return res.status(400).json({
+                message: 'Store ID must be exactly 4 characters.'
+            });
+        }
+
+        if (!cleanOrderNumber || cleanOrderNumber.length > 20) {
+            return res.status(400).json({
+                message: 'Order number is required and cannot be longer than 20 characters.'
+            });
+        }
+
+        if (Number.isNaN(parsedOrderDate.getTime())) {
+            return res.status(400).json({
+                message: 'Order date is not valid.'
+            });
+        }
+
+        if (!cleanPayTerms || cleanPayTerms.length > 12) {
+            return res.status(400).json({
+                message: 'Pay terms are required and cannot be longer than 12 characters.'
+            });
+        }
+
+        const cleanItems = items.map((item) => {
+            return {
+                title_id: String(item.title_id || '').trim().toUpperCase(),
+                qty: Number(item.qty)
+            };
+        });
+
+        for (const item of cleanItems) {
+            if (item.title_id.length !== 6) {
+                return res.status(400).json({
+                    message: 'Each title ID must be exactly 6 characters.'
+                });
+            }
+
+            if (!Number.isInteger(item.qty) || item.qty <= 0) {
+                return res.status(400).json({
+                    message: 'Each quantity must be a whole number greater than 0.'
+                });
+            }
+        }
+
+        const duplicateTitleIds = cleanItems
+            .map(item => item.title_id)
+            .filter((titleId, index, array) => array.indexOf(titleId) !== index);
+
+        if (duplicateTitleIds.length > 0) {
+            return res.status(400).json({
+                message: 'The same title cannot be added twice in the same order. Increase the quantity instead.'
+            });
+        }
+
+        const pool = await sql.connect(dbConfig);
+
+        const storeCheck = await pool.request()
+            .input('stor_id', sql.Char(4), cleanStoreId)
+            .query(`
+                SELECT stor_id
+                FROM stores
+                WHERE stor_id = @stor_id
+            `);
+
+        if (storeCheck.recordset.length === 0) {
+            return res.status(400).json({
+                message: 'Selected store does not exist.'
+            });
+        }
+
+        for (const item of cleanItems) {
+            const titleCheck = await pool.request()
+                .input('title_id', sql.VarChar(6), item.title_id)
+                .query(`
+                    SELECT title_id
+                    FROM titles
+                    WHERE title_id = @title_id
+                `);
+
+            if (titleCheck.recordset.length === 0) {
+                return res.status(400).json({
+                    message: `Selected title ${item.title_id} does not exist.`
+                });
+            }
+
+            const duplicateCheck = await pool.request()
+                .input('stor_id', sql.Char(4), cleanStoreId)
+                .input('ord_num', sql.VarChar(20), cleanOrderNumber)
+                .input('title_id', sql.VarChar(6), item.title_id)
+                .query(`
+                    SELECT
+                        stor_id,
+                        ord_num,
+                        title_id
+                    FROM sales
+                    WHERE stor_id = @stor_id
+                    AND ord_num = @ord_num
+                    AND title_id = @title_id
+                `);
+
+            if (duplicateCheck.recordset.length > 0) {
+                return res.status(409).json({
+                    message: `Title ${item.title_id} already exists in this order.`
+                });
+            }
+        }
+
+        transaction = new sql.Transaction(pool);
+        await transaction.begin();
+
+        const insertedLines = [];
+
+        for (const item of cleanItems) {
+            const insertRequest = new sql.Request(transaction);
+
+            const insertResult = await insertRequest
+                .input('stor_id', sql.Char(4), cleanStoreId)
+                .input('ord_num', sql.VarChar(20), cleanOrderNumber)
+                .input('ord_date', sql.DateTime, parsedOrderDate)
+                .input('qty', sql.SmallInt, item.qty)
+                .input('payterms', sql.VarChar(12), cleanPayTerms)
+                .input('title_id', sql.VarChar(6), item.title_id)
+                .query(`
+                    INSERT INTO sales
+                        (
+                            stor_id,
+                            ord_num,
+                            ord_date,
+                            qty,
+                            payterms,
+                            title_id
+                        )
+                    OUTPUT
+                        INSERTED.stor_id,
+                        INSERTED.ord_num,
+                        INSERTED.ord_date,
+                        INSERTED.qty,
+                        INSERTED.payterms,
+                        INSERTED.title_id
+                    VALUES
+                        (
+                            @stor_id,
+                            @ord_num,
+                            @ord_date,
+                            @qty,
+                            @payterms,
+                            @title_id
+                        )
+                `);
+
+            insertedLines.push(insertResult.recordset[0]);
+        }
+
+        await transaction.commit();
+
+        res.status(201).json({
+            message: 'Sales order created successfully.',
+            order: {
+                stor_id: cleanStoreId,
+                ord_num: cleanOrderNumber,
+                ord_date: parsedOrderDate,
+                payterms: cleanPayTerms,
+                line_count: insertedLines.length,
+                lines: insertedLines
+            }
+        });
+
+    } catch (err) {
+        if (transaction) {
+            try {
+                await transaction.rollback();
+            } catch (rollbackErr) {
+                console.error('Create sales order rollback error:', rollbackErr);
+            }
+        }
+
+        console.error('Create full sales order error:', err);
+
+        res.status(500).json({
+            message: 'Error creating sales order.',
+            error: err.message
+        });
+    }
+});
+
+
+
+// UPDATE EXISTING SALE LINE
+// stor_id, ord_num, and title_id stay as the original key
 // user can update order date, quantity, and pay terms
 app.put('/api/sales/:stor_id/:ord_num/:title_id', authenticateToken, requireSalesAccess, async (req, res) => {
     try {
@@ -2615,11 +3008,11 @@ app.put('/api/sales/:stor_id/:ord_num/:title_id', authenticateToken, requireSale
             });
         }
 
-        const cleanOriginalStoreId = originalStoreId.trim();
-        const cleanOriginalOrderNumber = originalOrderNumber.trim();
-        const cleanOriginalTitleId = originalTitleId.trim().toUpperCase();
+        const cleanOriginalStoreId = String(originalStoreId).trim();
+        const cleanOriginalOrderNumber = String(originalOrderNumber).trim();
+        const cleanOriginalTitleId = String(originalTitleId).trim().toUpperCase();
 
-        const cleanPayTerms = payterms.trim();
+        const cleanPayTerms = String(payterms).trim();
 
         const parsedOrderDate = new Date(ord_date);
         const parsedQty = Number(qty);
@@ -2662,7 +3055,6 @@ app.put('/api/sales/:stor_id/:ord_num/:title_id', authenticateToken, requireSale
 
         const pool = await sql.connect(dbConfig);
 
-        // check if sale exists
         const saleCheck = await pool.request()
             .input('stor_id', sql.Char(4), cleanOriginalStoreId)
             .input('ord_num', sql.VarChar(20), cleanOriginalOrderNumber)
@@ -2680,7 +3072,7 @@ app.put('/api/sales/:stor_id/:ord_num/:title_id', authenticateToken, requireSale
 
         if (saleCheck.recordset.length === 0) {
             return res.status(404).json({
-                message: 'Sale not found.'
+                message: 'Sale line not found.'
             });
         }
 
@@ -2703,14 +3095,14 @@ app.put('/api/sales/:stor_id/:ord_num/:title_id', authenticateToken, requireSale
             `);
 
         res.json({
-            message: 'Sale updated successfully.'
+            message: 'Sale line updated successfully.'
         });
 
     } catch (err) {
-        console.error('Update sale error:', err);
+        console.error('Update sale line error:', err);
 
         res.status(500).json({
-            message: 'Error updating sale.',
+            message: 'Error updating sale line.',
             error: err.message
         });
     }
@@ -2718,7 +3110,7 @@ app.put('/api/sales/:stor_id/:ord_num/:title_id', authenticateToken, requireSale
 
 
 
-// DELETE SALE
+// DELETE SALE LINE
 app.delete('/api/sales/:stor_id/:ord_num/:title_id', authenticateToken, requireSalesAccess, async (req, res) => {
     try {
         const originalStoreId = req.params.stor_id;
@@ -2731,13 +3123,12 @@ app.delete('/api/sales/:stor_id/:ord_num/:title_id', authenticateToken, requireS
             });
         }
 
-        const cleanOriginalStoreId = originalStoreId.trim();
-        const cleanOriginalOrderNumber = originalOrderNumber.trim();
-        const cleanOriginalTitleId = originalTitleId.trim().toUpperCase();
+        const cleanOriginalStoreId = String(originalStoreId).trim();
+        const cleanOriginalOrderNumber = String(originalOrderNumber).trim();
+        const cleanOriginalTitleId = String(originalTitleId).trim().toUpperCase();
 
         const pool = await sql.connect(dbConfig);
 
-        // check if sale exists
         const saleCheck = await pool.request()
             .input('stor_id', sql.Char(4), cleanOriginalStoreId)
             .input('ord_num', sql.VarChar(20), cleanOriginalOrderNumber)
@@ -2755,7 +3146,7 @@ app.delete('/api/sales/:stor_id/:ord_num/:title_id', authenticateToken, requireS
 
         if (saleCheck.recordset.length === 0) {
             return res.status(404).json({
-                message: 'Sale not found.'
+                message: 'Sale line not found.'
             });
         }
 
@@ -2771,14 +3162,14 @@ app.delete('/api/sales/:stor_id/:ord_num/:title_id', authenticateToken, requireS
             `);
 
         res.json({
-            message: 'Sale deleted successfully.'
+            message: 'Sale line deleted successfully.'
         });
 
     } catch (err) {
-        console.error('Delete sale error:', err);
+        console.error('Delete sale line error:', err);
 
         res.status(500).json({
-            message: 'Error deleting sale.',
+            message: 'Error deleting sale line.',
             error: err.message
         });
     }
@@ -2786,8 +3177,66 @@ app.delete('/api/sales/:stor_id/:ord_num/:title_id', authenticateToken, requireS
 
 
 
+// DELETE FULL ORDER
+// this deletes every title line inside the selected order
+app.delete('/api/sales/orders/:stor_id/:ord_num', authenticateToken, requireSalesAccess, async (req, res) => {
+    try {
+        const cleanStoreId = String(req.params.stor_id || '').trim();
+        const cleanOrderNumber = String(req.params.ord_num || '').trim();
+
+        if (!cleanStoreId || !cleanOrderNumber) {
+            return res.status(400).json({
+                message: 'Store ID and order number are required.'
+            });
+        }
+
+        const pool = await sql.connect(dbConfig);
+
+        const orderCheck = await pool.request()
+            .input('stor_id', sql.Char(4), cleanStoreId)
+            .input('ord_num', sql.VarChar(20), cleanOrderNumber)
+            .query(`
+                SELECT
+                    stor_id,
+                    ord_num,
+                    title_id
+                FROM sales
+                WHERE stor_id = @stor_id
+                AND ord_num = @ord_num
+            `);
+
+        if (orderCheck.recordset.length === 0) {
+            return res.status(404).json({
+                message: 'Order not found.'
+            });
+        }
+
+        await pool.request()
+            .input('stor_id', sql.Char(4), cleanStoreId)
+            .input('ord_num', sql.VarChar(20), cleanOrderNumber)
+            .query(`
+                DELETE FROM sales
+                WHERE stor_id = @stor_id
+                AND ord_num = @ord_num
+            `);
+
+        res.json({
+            message: 'Sales order deleted successfully.'
+        });
+
+    } catch (err) {
+        console.error('Delete full sales order error:', err);
+
+        res.status(500).json({
+            message: 'Error deleting sales order.',
+            error: err.message
+        });
+    }
+});
+
 // EMAIL SALE SUMMARY
 // this uses the same email setup as your employee invite email
+// supports both one sale line and a full order with multiple lines
 app.post('/api/sales/email-summary', authenticateToken, requireSalesAccess, async (req, res) => {
     try {
         const {
@@ -2814,15 +3263,107 @@ app.post('/api/sales/email-summary', authenticateToken, requireSalesAccess, asyn
             return Number(value ?? 0).toFixed(2);
         };
 
-        const quantity = Number(sale.qty ?? 0);
-        const unitPrice = Number(sale.price ?? 0);
-        const estimatedRevenue = Number(sale.estimated_revenue ?? quantity * unitPrice);
+        const formatCleanDate = (value) => {
+            if (!value) {
+                return 'N/A';
+            }
 
-        const subject = `Sale Summary - Order ${sale.ord_num}`;
+            const rawValue = String(value);
+
+            if (rawValue.includes('T')) {
+                const dateOnly = rawValue.split('T')[0];
+                const dateParts = dateOnly.split('-').map(Number);
+
+                if (dateParts.length === 3) {
+                    const cleanDate = new Date(dateParts[0], dateParts[1] - 1, dateParts[2]);
+
+                    return cleanDate.toLocaleDateString('en-US', {
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric'
+                    });
+                }
+            }
+
+            const dateValue = new Date(value);
+
+            if (Number.isNaN(dateValue.getTime())) {
+                return rawValue;
+            }
+
+            return dateValue.toLocaleDateString('en-US', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+            });
+        };
+
+        const lines = Array.isArray(sale.lines) && sale.lines.length > 0
+            ? sale.lines
+            : [sale];
+
+        const totalQuantity = lines.reduce((total, line) => {
+            return total + Number(line.qty || 0);
+        }, 0);
+
+        const orderTotal = lines.reduce((total, line) => {
+            const quantity = Number(line.qty || 0);
+            const unitPrice = Number(line.price || 0);
+            const lineRevenue = Number(line.estimated_revenue ?? quantity * unitPrice);
+
+            return total + lineRevenue;
+        }, 0);
+
+        const orderNumber = sale.ord_num || lines[0].ord_num;
+        const orderDate = formatCleanDate(sale.ord_date || lines[0].ord_date);
+        const paymentTerms = sale.payterms || lines[0].payterms;
+
+        const storeId = sale.stor_id || lines[0].stor_id;
+        const storeName = sale.stor_name || lines[0].stor_name || storeId;
+        const storeCity = sale.store_city || lines[0].store_city || '';
+        const storeState = sale.store_state || lines[0].store_state || '';
+        const storeLocation = `${storeCity} ${storeState}`.trim() || 'N/A';
+
+        const subject = `Sale Summary - Order ${orderNumber}`;
+
+        const lineRows = lines.map((line) => {
+            const quantity = Number(line.qty || 0);
+            const unitPrice = Number(line.price || 0);
+            const lineRevenue = Number(line.estimated_revenue ?? quantity * unitPrice);
+
+            return `
+                <tr>
+                    <td style="border-bottom: 1px solid #d6d6d6; padding: 14px 10px;">
+                        <strong>${escapeHtml(line.title || line.title_id)}</strong><br>
+                        <span style="color: #666666; font-size: 12px;">${escapeHtml(line.pub_name || 'N/A')}</span>
+                    </td>
+
+                    <td style="border-bottom: 1px solid #d6d6d6; padding: 14px 10px;">
+                        ${escapeHtml(line.title_id)}
+                    </td>
+
+                    <td style="border-bottom: 1px solid #d6d6d6; padding: 14px 10px;">
+                        ${escapeHtml(line.type || 'N/A')}
+                    </td>
+
+                    <td style="border-bottom: 1px solid #d6d6d6; padding: 14px 10px; text-align: right;">
+                        $${formatMoney(unitPrice)}
+                    </td>
+
+                    <td style="border-bottom: 1px solid #d6d6d6; padding: 14px 10px; text-align: right;">
+                        ${quantity}
+                    </td>
+
+                    <td style="border-bottom: 1px solid #d6d6d6; padding: 14px 10px; text-align: right; color: #137333; font-weight: 800;">
+                        $${formatMoney(lineRevenue)}
+                    </td>
+                </tr>
+            `;
+        }).join('');
 
         const html = `
             <div style="font-family: Arial, Helvetica, sans-serif; background-color: #f3f5f7; padding: 24px; color: #1a1a1a;">
-                <div style="max-width: 820px; margin: 0 auto; background-color: #ffffff; border: 1px solid #d6d6d6;">
+                <div style="max-width: 900px; margin: 0 auto; background-color: #ffffff; border: 1px solid #d6d6d6;">
 
                     <div style="height: 10px; background: linear-gradient(90deg, #0066cc, #137333);"></div>
 
@@ -2847,13 +3388,13 @@ app.post('/api/sales/email-summary', authenticateToken, requireSalesAccess, asyn
                                     </div>
 
                                     <div style="font-size: 22px; font-weight: 800; color: #0066cc; margin-top: 4px;">
-                                        ${escapeHtml(sale.ord_num)}
+                                        ${escapeHtml(orderNumber)}
                                     </div>
 
                                     <div style="margin-top: 12px; font-size: 12px; color: #333333; line-height: 1.7;">
-                                        <div><strong>Order Date:</strong> ${escapeHtml(sale.ord_date)}</div>
-                                        <div><strong>Store ID:</strong> ${escapeHtml(sale.stor_id)}</div>
-                                        <div><strong>Title ID:</strong> ${escapeHtml(sale.title_id)}</div>
+                                        <div><strong>Order Date:</strong> ${escapeHtml(orderDate)}</div>
+                                        <div><strong>Store ID:</strong> ${escapeHtml(storeId)}</div>
+                                        <div><strong>Line Items:</strong> ${lines.length}</div>
                                     </div>
                                 </div>
                             </div>
@@ -2866,7 +3407,7 @@ app.post('/api/sales/email-summary', authenticateToken, requireSalesAccess, asyn
                                         Payment Terms
                                     </div>
                                     <div style="font-size: 18px; font-weight: 800; margin-top: 6px;">
-                                        ${escapeHtml(sale.payterms)}
+                                        ${escapeHtml(paymentTerms)}
                                     </div>
                                 </div>
                             </div>
@@ -2874,10 +3415,10 @@ app.post('/api/sales/email-summary', authenticateToken, requireSalesAccess, asyn
                             <div style="display: table-cell; width: 33%; padding-right: 10px;">
                                 <div style="border: 1px solid #d6d6d6; border-left: 5px solid #0066cc; padding: 14px;">
                                     <div style="font-size: 11px; text-transform: uppercase; color: #555555; font-weight: 700;">
-                                        Quantity Sold
+                                        Total Quantity
                                     </div>
                                     <div style="font-size: 18px; font-weight: 800; margin-top: 6px;">
-                                        ${quantity}
+                                        ${totalQuantity}
                                     </div>
                                 </div>
                             </div>
@@ -2885,10 +3426,10 @@ app.post('/api/sales/email-summary', authenticateToken, requireSalesAccess, asyn
                             <div style="display: table-cell; width: 34%;">
                                 <div style="border: 1px solid #d6d6d6; border-left: 5px solid #137333; background-color: #f3fbf6; padding: 14px;">
                                     <div style="font-size: 11px; text-transform: uppercase; color: #555555; font-weight: 700;">
-                                        Estimated Revenue
+                                        Order Revenue
                                     </div>
                                     <div style="font-size: 18px; font-weight: 800; color: #137333; margin-top: 6px;">
-                                        $${formatMoney(estimatedRevenue)}
+                                        $${formatMoney(orderTotal)}
                                     </div>
                                 </div>
                             </div>
@@ -2898,34 +3439,14 @@ app.post('/api/sales/email-summary', authenticateToken, requireSalesAccess, asyn
                             Customer / Store Information
                         </h2>
 
-                        <div style="display: table; width: 100%; margin-bottom: 24px;">
-                            <div style="display: table-cell; width: 50%; padding-right: 10px;">
-                                <div style="border: 1px solid #d6d6d6; padding: 14px;">
-                                    <h3 style="margin: 0 0 12px 0; font-size: 15px; color: #0066cc;">
-                                        Store Details
-                                    </h3>
-
-                                    <p style="margin: 6px 0;"><strong>Store:</strong> ${escapeHtml(sale.stor_name || sale.stor_id)}</p>
-                                    <p style="margin: 6px 0;"><strong>Store ID:</strong> ${escapeHtml(sale.stor_id)}</p>
-                                    <p style="margin: 6px 0;"><strong>Location:</strong> ${escapeHtml(`${sale.store_city || ''} ${sale.store_state || ''}`.trim() || 'N/A')}</p>
-                                </div>
-                            </div>
-
-                            <div style="display: table-cell; width: 50%;">
-                                <div style="border: 1px solid #d6d6d6; padding: 14px;">
-                                    <h3 style="margin: 0 0 12px 0; font-size: 15px; color: #0066cc;">
-                                        Publisher Details
-                                    </h3>
-
-                                    <p style="margin: 6px 0;"><strong>Publisher:</strong> ${escapeHtml(sale.pub_name || 'N/A')}</p>
-                                    <p style="margin: 6px 0;"><strong>Publisher ID:</strong> ${escapeHtml(sale.pub_id || 'N/A')}</p>
-                                    <p style="margin: 6px 0;"><strong>Book Type:</strong> ${escapeHtml(sale.type || 'N/A')}</p>
-                                </div>
-                            </div>
+                        <div style="border: 1px solid #d6d6d6; padding: 14px; margin-bottom: 24px;">
+                            <p style="margin: 6px 0;"><strong>Store:</strong> ${escapeHtml(storeName)}</p>
+                            <p style="margin: 6px 0;"><strong>Store ID:</strong> ${escapeHtml(storeId)}</p>
+                            <p style="margin: 6px 0;"><strong>Location:</strong> ${escapeHtml(storeLocation)}</p>
                         </div>
 
                         <h2 style="font-size: 15px; text-transform: uppercase; border-bottom: 1px solid #d6d6d6; padding-bottom: 8px; margin: 28px 0 12px 0;">
-                            Order Line Item
+                            Order Line Items
                         </h2>
 
                         <table style="width: 100%; border-collapse: collapse; margin-top: 12px;">
@@ -2933,6 +3454,7 @@ app.post('/api/sales/email-summary', authenticateToken, requireSalesAccess, asyn
                                 <tr>
                                     <th style="background-color: #1a1a1a; color: #ffffff; padding: 12px 10px; text-align: left; font-size: 12px;">Title</th>
                                     <th style="background-color: #1a1a1a; color: #ffffff; padding: 12px 10px; text-align: left; font-size: 12px;">Title ID</th>
+                                    <th style="background-color: #1a1a1a; color: #ffffff; padding: 12px 10px; text-align: left; font-size: 12px;">Type</th>
                                     <th style="background-color: #1a1a1a; color: #ffffff; padding: 12px 10px; text-align: right; font-size: 12px;">Unit Price</th>
                                     <th style="background-color: #1a1a1a; color: #ffffff; padding: 12px 10px; text-align: right; font-size: 12px;">Qty</th>
                                     <th style="background-color: #1a1a1a; color: #ffffff; padding: 12px 10px; text-align: right; font-size: 12px;">Revenue</th>
@@ -2940,47 +3462,21 @@ app.post('/api/sales/email-summary', authenticateToken, requireSalesAccess, asyn
                             </thead>
 
                             <tbody>
-                                <tr>
-                                    <td style="border-bottom: 1px solid #d6d6d6; padding: 14px 10px;">
-                                        <strong>${escapeHtml(sale.title || sale.title_id)}</strong><br>
-                                        <span style="color: #666666; font-size: 12px;">${escapeHtml(sale.pub_name || 'N/A')}</span>
-                                    </td>
-
-                                    <td style="border-bottom: 1px solid #d6d6d6; padding: 14px 10px;">
-                                        ${escapeHtml(sale.title_id)}
-                                    </td>
-
-                                    <td style="border-bottom: 1px solid #d6d6d6; padding: 14px 10px; text-align: right;">
-                                        $${formatMoney(unitPrice)}
-                                    </td>
-
-                                    <td style="border-bottom: 1px solid #d6d6d6; padding: 14px 10px; text-align: right;">
-                                        ${quantity}
-                                    </td>
-
-                                    <td style="border-bottom: 1px solid #d6d6d6; padding: 14px 10px; text-align: right; color: #137333; font-weight: 800;">
-                                        $${formatMoney(estimatedRevenue)}
-                                    </td>
-                                </tr>
+                                ${lineRows}
                             </tbody>
                         </table>
 
                         <div style="margin-top: 24px; text-align: right;">
-                            <div style="display: inline-block; width: 340px; border: 2px solid #137333; background-color: #f3fbf6; text-align: left;">
+                            <div style="display: inline-block; width: 360px; border: 2px solid #137333; background-color: #f3fbf6; text-align: left;">
 
                                 <div style="display: flex; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid #c7e8d1;">
                                     <span>Subtotal</span>
-                                    <strong>$${formatMoney(estimatedRevenue)}</strong>
-                                </div>
-
-                                <div style="display: flex; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid #c7e8d1;">
-                                    <span>Tax</span>
-                                    <strong>Not calculated</strong>
+                                    <strong>$${formatMoney(orderTotal)}</strong>
                                 </div>
 
                                 <div style="display: flex; justify-content: space-between; padding: 14px 16px; background-color: #137333; color: #ffffff; font-size: 18px; font-weight: 800;">
-                                    <span>Total Estimated Revenue</span>
-                                    <strong>$${formatMoney(estimatedRevenue)}</strong>
+                                    <span>Total Order Revenue</span>
+                                    <strong>$${formatMoney(orderTotal)}</strong>
                                 </div>
                             </div>
                         </div>
@@ -2988,7 +3484,8 @@ app.post('/api/sales/email-summary', authenticateToken, requireSalesAccess, asyn
                         <div style="margin-top: 28px; border: 1px solid #d6d6d6; padding: 14px; background-color: #fafafa; font-size: 12px; color: #444444; line-height: 1.6;">
                             <strong>Report Notes:</strong>
                             This document is generated for internal business reporting purposes.
-                            Estimated revenue is calculated using the title price multiplied by quantity sold.
+                            Revenue is calculated using each title price multiplied by quantity sold.
+                            Final accounting totals may differ if discounts, refunds, or other adjustments apply.
                         </div>
 
                         <div style="margin-top: 28px; padding-top: 14px; border-top: 1px solid #d6d6d6; font-size: 11px; color: #666666;">
@@ -3030,6 +3527,13 @@ app.post('/api/sales/email-summary', authenticateToken, requireSalesAccess, asyn
         });
     }
 });
+
+
+
+
+
+
+
 
 
 
