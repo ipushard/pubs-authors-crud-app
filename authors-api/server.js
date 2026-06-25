@@ -3110,6 +3110,69 @@ app.put('/api/sales/:stor_id/:ord_num/:title_id', authenticateToken, requireSale
 
 
 
+
+// DELETE FULL ORDER
+// this deletes every title line inside the selected order
+app.delete('/api/sales/orders/:stor_id/:ord_num', authenticateToken, requireSalesAccess, async (req, res) => {
+    try {
+        const cleanStoreId = String(req.params.stor_id || '').trim();
+        const cleanOrderNumber = String(req.params.ord_num || '').trim();
+
+        if (!cleanStoreId || !cleanOrderNumber) {
+            return res.status(400).json({
+                message: 'Store ID and order number are required.'
+            });
+        }
+
+        const pool = await sql.connect(dbConfig);
+
+        const orderCheck = await pool.request()
+            .input('stor_id', sql.Char(4), cleanStoreId)
+            .input('ord_num', sql.VarChar(20), cleanOrderNumber)
+            .query(`
+                SELECT
+                    stor_id,
+                    ord_num,
+                    title_id
+                FROM sales
+                WHERE stor_id = @stor_id
+                AND ord_num = @ord_num
+            `);
+
+        if (orderCheck.recordset.length === 0) {
+            return res.status(404).json({
+                message: 'Order not found.'
+            });
+        }
+
+        await pool.request()
+            .input('stor_id', sql.Char(4), cleanStoreId)
+            .input('ord_num', sql.VarChar(20), cleanOrderNumber)
+            .query(`
+                DELETE FROM sales
+                WHERE stor_id = @stor_id
+                AND ord_num = @ord_num
+            `);
+
+        res.json({
+            message: 'Sales order deleted successfully.'
+        });
+
+    } catch (err) {
+        console.error('Delete full sales order error:', err);
+
+        res.status(500).json({
+            message: 'Error deleting sales order.',
+            error: err.message
+        });
+    }
+});
+
+
+
+
+
+
 // DELETE SALE LINE
 app.delete('/api/sales/:stor_id/:ord_num/:title_id', authenticateToken, requireSalesAccess, async (req, res) => {
     try {
@@ -3177,62 +3240,7 @@ app.delete('/api/sales/:stor_id/:ord_num/:title_id', authenticateToken, requireS
 
 
 
-// DELETE FULL ORDER
-// this deletes every title line inside the selected order
-app.delete('/api/sales/orders/:stor_id/:ord_num', authenticateToken, requireSalesAccess, async (req, res) => {
-    try {
-        const cleanStoreId = String(req.params.stor_id || '').trim();
-        const cleanOrderNumber = String(req.params.ord_num || '').trim();
 
-        if (!cleanStoreId || !cleanOrderNumber) {
-            return res.status(400).json({
-                message: 'Store ID and order number are required.'
-            });
-        }
-
-        const pool = await sql.connect(dbConfig);
-
-        const orderCheck = await pool.request()
-            .input('stor_id', sql.Char(4), cleanStoreId)
-            .input('ord_num', sql.VarChar(20), cleanOrderNumber)
-            .query(`
-                SELECT
-                    stor_id,
-                    ord_num,
-                    title_id
-                FROM sales
-                WHERE stor_id = @stor_id
-                AND ord_num = @ord_num
-            `);
-
-        if (orderCheck.recordset.length === 0) {
-            return res.status(404).json({
-                message: 'Order not found.'
-            });
-        }
-
-        await pool.request()
-            .input('stor_id', sql.Char(4), cleanStoreId)
-            .input('ord_num', sql.VarChar(20), cleanOrderNumber)
-            .query(`
-                DELETE FROM sales
-                WHERE stor_id = @stor_id
-                AND ord_num = @ord_num
-            `);
-
-        res.json({
-            message: 'Sales order deleted successfully.'
-        });
-
-    } catch (err) {
-        console.error('Delete full sales order error:', err);
-
-        res.status(500).json({
-            message: 'Error deleting sales order.',
-            error: err.message
-        });
-    }
-});
 
 // EMAIL SALE SUMMARY
 // this uses the same email setup as your employee invite email
@@ -4049,37 +4057,64 @@ app.put('/api/authors/:id', async (req, res) => {
 
 
 
-// SOFT DELETE / DEACTIVATE an author by ID
-// This does not physically delete the author.
-// It only marks the author as inactive.
-app.delete('/api/authors/:id', async (req, res) => {
+// UPDATE AUTHOR ACTIVE STATUS
+// this is used by the Active / Inactive slide toggle on the Authors page
+app.put('/api/authors/:id/status', async (req, res) => {
     try {
         const authorId = req.params.id;
 
+        const {
+            is_active
+        } = req.body;
+
+        if (is_active === null || is_active === undefined) {
+            return res.status(400).json({
+                message: 'Author active status is required.'
+            });
+        }
+
+        const requestedStatus = is_active === true || is_active === 1;
+
         const pool = await sql.connect(dbConfig);
 
-        const result = await pool.request()
+        const authorCheck = await pool.request()
             .input('au_id', sql.VarChar(11), authorId)
             .query(`
-                UPDATE authors
-                SET is_active = 0
+                SELECT
+                    au_id,
+                    au_fname,
+                    au_lname,
+                    is_active
+                FROM authors
                 WHERE au_id = @au_id
             `);
 
-        if (result.rowsAffected[0] === 0) {
+        if (authorCheck.recordset.length === 0) {
             return res.status(404).json({
                 message: 'Author not found.'
             });
         }
 
+        await pool.request()
+            .input('au_id', sql.VarChar(11), authorId)
+            .input('is_active', sql.Bit, requestedStatus ? 1 : 0)
+            .query(`
+                UPDATE authors
+                SET is_active = @is_active
+                WHERE au_id = @au_id
+            `);
+
         res.json({
-            message: 'Author deactivated successfully.'
+            message: requestedStatus
+                ? 'Author marked as active successfully.'
+                : 'Author marked as inactive successfully.'
         });
+
     } catch (err) {
-        console.error('Database error deactivating author:', err);
+        console.error('Update author status error:', err);
 
         res.status(500).json({
-            message: 'Error deactivating author.',
+            message: 'Error updating author status.',
             error: err.message
         });
     }
@@ -4087,37 +4122,63 @@ app.delete('/api/authors/:id', async (req, res) => {
 
 
 
-
-// UNARCHIVE an author by ID
-// This marks archived author as active again.
-app.put('/api/authors/:id/unarchive', async (req, res) => {
+// DELETE AUTHOR
+// this permanently deletes an author only if the author is not connected to any title records
+app.delete('/api/authors/:id', async (req, res) => {
     try {
         const authorId = req.params.id;
 
         const pool = await sql.connect(dbConfig);
 
-        const result = await pool.request()
+        const authorCheck = await pool.request()
             .input('au_id', sql.VarChar(11), authorId)
             .query(`
-                UPDATE authors
-                SET is_active = 1
+                SELECT
+                    au_id,
+                    au_fname,
+                    au_lname
+                FROM authors
                 WHERE au_id = @au_id
             `);
 
-        if (result.rowsAffected[0] === 0) {
+        if (authorCheck.recordset.length === 0) {
             return res.status(404).json({
                 message: 'Author not found.'
             });
         }
 
+        const titleAuthorCheck = await pool.request()
+            .input('au_id', sql.VarChar(11), authorId)
+            .query(`
+                SELECT COUNT(*) AS titleAuthorCount
+                FROM titleauthor
+                WHERE au_id = @au_id
+            `);
+
+        const titleAuthorCount = titleAuthorCheck.recordset[0].titleAuthorCount;
+
+        if (titleAuthorCount > 0) {
+            return res.status(400).json({
+                message: `This author cannot be deleted because ${titleAuthorCount} title assignment record(s) are connected to this author. Remove those title-author assignments first.`
+            });
+        }
+
+        await pool.request()
+            .input('au_id', sql.VarChar(11), authorId)
+            .query(`
+                DELETE FROM authors
+                WHERE au_id = @au_id
+            `);
+
         res.json({
-            message: 'Author unarchived successfully.'
+            message: 'Author deleted successfully.'
         });
+
     } catch (err) {
-        console.error('Database error unarchiving author:', err);
+        console.error('Delete author error:', err);
 
         res.status(500).json({
-            message: 'Error unarchiving author.',
+            message: 'Error deleting author.',
             error: err.message
         });
     }
