@@ -38,6 +38,13 @@ export class AdminEmployeeService {
     return this.http.post<EmployeeInviteResponse>(`${this.apiUrl}/employees/invite`, employee);
   }
 
+  enableEmployeeAccount(empId: string, email: string): Observable<EmployeeInviteResponse> {
+  return this.http.post<EmployeeInviteResponse>(
+    `${this.apiUrl}/employees/${empId}/enable-account`,
+    { email }
+  );
+}
+
   updateEmployee(empId: string, employee: EmployeeUpdateRequest): Observable<EmployeeUpdateResponse> {
     return this.http.put<EmployeeUpdateResponse>(`${this.apiUrl}/employees/${empId}`, employee);
   }
