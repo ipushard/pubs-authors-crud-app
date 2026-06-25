@@ -473,6 +473,192 @@ async function requireSalesAccess(req, res, next) {
                                                                                 });
 
 
+
+
+
+
+
+// ADMIN CREATE EMPLOYEE ONLY
+// this creates employee record without app login account
+// email is not required here because not every employee needs login access
+app.post('/api/admin/employees', authenticateToken, requireAdmin, async (req, res) => {
+    try {
+        const {
+            emp_id,
+            fname,
+            minit,
+            lname,
+            job_id,
+            job_lvl,
+            pub_id
+        } = req.body;
+
+        if (!emp_id || !fname || !lname || !job_id || !job_lvl || !pub_id) {
+            return res.status(400).json({
+                message: 'Employee ID, first name, last name, job, job level, and publisher are required.'
+            });
+        }
+
+        const cleanEmpId = String(emp_id).trim().toUpperCase();
+        const cleanFirstName = String(fname).trim();
+        const cleanMiddleInitial = minit ? String(minit).trim().toUpperCase() : null;
+        const cleanLastName = String(lname).trim();
+        const cleanPubId = String(pub_id).trim();
+
+        const parsedJobId = Number(job_id);
+        const parsedJobLevel = Number(job_lvl);
+
+        const empIdPattern = /^([A-Z]{3}|[A-Z]-[A-Z])[0-9]{5}[MF]$/i;
+
+        if (!empIdPattern.test(cleanEmpId)) {
+            return res.status(400).json({
+                message: 'Employee ID must match the Pubs database rule. Use format like MBR99828M or M-B99828M.'
+            });
+        }
+
+        if (!cleanFirstName) {
+            return res.status(400).json({
+                message: 'First name is required.'
+            });
+        }
+
+        if (!cleanLastName) {
+            return res.status(400).json({
+                message: 'Last name is required.'
+            });
+        }
+
+        if (!Number.isInteger(parsedJobId)) {
+            return res.status(400).json({
+                message: 'Valid job is required.'
+            });
+        }
+
+        if (!Number.isInteger(parsedJobLevel)) {
+            return res.status(400).json({
+                message: 'Job level must be a whole number.'
+            });
+        }
+
+        if (!cleanPubId) {
+            return res.status(400).json({
+                message: 'Publisher is required.'
+            });
+        }
+
+        const pool = await sql.connect(dbConfig);
+
+        // check if employee ID already exists
+        const employeeCheck = await pool.request()
+            .input('emp_id', sql.Char(9), cleanEmpId)
+            .query(`
+                SELECT emp_id
+                FROM employee
+                WHERE emp_id = @emp_id
+            `);
+
+        if (employeeCheck.recordset.length > 0) {
+            return res.status(409).json({
+                message: 'Employee ID already exists.'
+            });
+        }
+
+        // check selected job and job level
+        const jobCheck = await pool.request()
+            .input('job_id', sql.SmallInt, parsedJobId)
+            .query(`
+                SELECT job_id, job_desc, min_lvl, max_lvl
+                FROM jobs
+                WHERE job_id = @job_id
+            `);
+
+        if (jobCheck.recordset.length === 0) {
+            return res.status(400).json({
+                message: 'Selected job does not exist.'
+            });
+        }
+
+        const selectedJob = jobCheck.recordset[0];
+
+        if (parsedJobLevel < selectedJob.min_lvl || parsedJobLevel > selectedJob.max_lvl) {
+            return res.status(400).json({
+                message: `Job level must be between ${selectedJob.min_lvl} and ${selectedJob.max_lvl} for ${selectedJob.job_desc}.`
+            });
+        }
+
+        // check selected publisher
+        const publisherCheck = await pool.request()
+            .input('pub_id', sql.Char(4), cleanPubId)
+            .query(`
+                SELECT pub_id
+                FROM publishers
+                WHERE pub_id = @pub_id
+            `);
+
+        if (publisherCheck.recordset.length === 0) {
+            return res.status(400).json({
+                message: 'Selected publisher does not exist.'
+            });
+        }
+
+        // insert employee only, no app_users record
+        await pool.request()
+            .input('emp_id', sql.Char(9), cleanEmpId)
+            .input('fname', sql.VarChar(20), cleanFirstName)
+            .input('minit', sql.Char(1), cleanMiddleInitial)
+            .input('lname', sql.VarChar(30), cleanLastName)
+            .input('job_id', sql.SmallInt, parsedJobId)
+            .input('job_lvl', sql.TinyInt, parsedJobLevel)
+            .input('pub_id', sql.Char(4), cleanPubId)
+            .query(`
+                INSERT INTO employee
+                    (
+                        emp_id,
+                        fname,
+                        minit,
+                        lname,
+                        job_id,
+                        job_lvl,
+                        pub_id,
+                        hire_date
+                    )
+                VALUES
+                    (
+                        @emp_id,
+                        @fname,
+                        @minit,
+                        @lname,
+                        @job_id,
+                        @job_lvl,
+                        @pub_id,
+                        GETDATE()
+                    )
+            `);
+
+        res.status(201).json({
+            message: 'Employee created successfully. No login account was created.'
+        });
+
+    } catch (err) {
+        console.error('Create employee only error:', err);
+
+        res.status(500).json({
+            message: 'Error creating employee.',
+            error: err.message
+        });
+    }
+});
+
+
+
+
+
+
+
+
+
+
+
 // GET EMPLOYEES AND APP USERS FOR ADMIN TABLE
 // this returns employee records joined with app user account information
 app.get('/api/admin/employees', authenticateToken, requireAdmin, async (req, res) => {
