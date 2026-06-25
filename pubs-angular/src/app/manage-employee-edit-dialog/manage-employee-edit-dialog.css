@@ -268,3 +268,187 @@
     align-items: stretch;
   }
 }
+
+/* success message inside edit dialog */
+.dialog-success {
+  margin: 16px 24px 0 24px;
+  padding: 12px 14px;
+
+  background-color: #e6f4ea;
+  color: #137333;
+  border: 1px solid #137333;
+  border-radius: 4px;
+
+  font-size: 14px;
+  font-weight: 800;
+}
+
+
+
+
+
+/* account enabled info box */
+.account-info-box {
+  background-color: #e6f4ea;
+  border: 1px solid #137333;
+  border-left: 6px solid #137333;
+  padding: 14px;
+  margin-bottom: 14px;
+
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.account-info-box > strong {
+  color: #137333;
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.account-info-box span {
+  color: #333333;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+
+
+
+
+/* no login account box */
+.no-account-box {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.no-account-box strong {
+  color: #1a1a1a;
+  font-size: 14px;
+}
+
+.no-account-box span {
+  color: #555555;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+
+
+
+
+/* enable account button area */
+.enable-account-actions {
+  margin-top: 14px;
+
+  display: flex;
+  justify-content: flex-start;
+}
+
+.enable-account-actions button {
+  font-weight: 800;
+}
+
+
+
+
+
+/* enable login account form */
+.enable-account-form {
+  margin-top: 16px;
+  padding: 16px;
+
+  background-color: #ffffff;
+  border: 1px solid #d6d6d6;
+  border-left: 6px solid #137333;
+}
+
+.enable-account-title h4 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 900;
+  color: #1a1a1a;
+}
+
+.enable-account-title p {
+  margin: 5px 0 14px 0;
+  color: #555555;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.enable-email-field {
+  width: 100%;
+}
+
+.enable-account-warning {
+  background-color: #fff4e5;
+  border: 1px solid #fbbc04;
+  border-left: 6px solid #fbbc04;
+  color: #5f3b00;
+
+  padding: 12px 14px;
+  margin-top: 4px;
+
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.4;
+}
+
+.enable-account-buttons {
+  margin-top: 14px;
+
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.enable-account-buttons button {
+  font-weight: 800;
+}
+
+
+
+
+
+@media (max-width: 800px) {
+  .enable-account-buttons,
+  .enable-account-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .enable-account-buttons button,
+  .enable-account-actions button {
+    width: 100%;
+  }
+}
+
+
+/* makes the dialog scroll instead of getting cut off by bottom of screen */
+:host {
+  display: block;
+  max-height: calc(100vh - 40px);
+  overflow-y: auto;
+}
+
+/* same scroll fix inside the actual shell */
+.dialog-shell {
+  max-height: calc(100vh - 40px);
+  overflow-y: auto;
+}
+
+/* keeps Cancel / Save buttons visible at bottom while scrolling */
+.dialog-actions {
+  position: sticky;
+  bottom: 0;
+  background-color: #ffffff;
+  border-top: 1px solid #d6d6d6;
+  z-index: 20;
+}
+
+/* add a little breathing room so button area does not touch screen bottom */
+.dialog-form {
+  padding-bottom: 12px;
+}

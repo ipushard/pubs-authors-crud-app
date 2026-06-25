@@ -8,6 +8,8 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatSelectModule } from '@angular/material/select';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 
+import { AdminEmployeeService } from '../services/admin-employee';
+
 import {
   AdminEmployee,
   EmployeeUpdateRequest,
@@ -45,6 +47,19 @@ export class ManageEmployeeEditDialog {
 
   errorMessage = '';
 
+  successMessage = '';
+
+
+
+  // enable account form inside edit popup
+  showEnableAccountForm = false;
+
+  enableAccountEmail = '';
+
+  isSendingInvite = false;
+
+
+
   currentUserEmpId = '';
 
   currentUserEmail = '';
@@ -53,8 +68,11 @@ export class ManageEmployeeEditDialog {
 
   originalIsActive = false;
 
+
+
   constructor(
     private dialogRef: MatDialogRef<ManageEmployeeEditDialog>,
+    private adminEmployeeService: AdminEmployeeService,
     @Inject(MAT_DIALOG_DATA) public data: ManageEmployeeEditDialogData
   ) {
     this.employee = { ...data.employee };
@@ -85,6 +103,8 @@ export class ManageEmployeeEditDialog {
     console.log('Current logged in email:', this.currentUserEmail);
   }
 
+
+
   onJobChange(): void {
     this.employee.job_id = Number(this.employee.job_id);
 
@@ -99,10 +119,13 @@ export class ManageEmployeeEditDialog {
     this.employee.job_lvl = selectedJob.min_lvl;
   }
 
+
+
   saveChanges(): void {
     console.log('Save Changes clicked');
 
     this.errorMessage = '';
+    this.successMessage = '';
 
     this.employee.job_id = Number(this.employee.job_id);
     this.employee.job_lvl = Number(this.employee.job_lvl);
@@ -152,9 +175,86 @@ export class ManageEmployeeEditDialog {
     this.dialogRef.close(updateData);
   }
 
+
+
   cancel(): void {
     this.dialogRef.close(null);
   }
+
+
+
+  // opens the enable login account mini form
+  openEnableAccountForm(): void {
+    this.errorMessage = '';
+    this.successMessage = '';
+
+    if (this.hasAppAccount()) {
+      this.errorMessage = 'This employee already has a login account.';
+      return;
+    }
+
+    this.enableAccountEmail = this.employee.email || '';
+    this.showEnableAccountForm = true;
+  }
+
+
+
+  // closes enable login account mini form
+  cancelEnableAccountForm(): void {
+    this.showEnableAccountForm = false;
+    this.enableAccountEmail = '';
+    this.errorMessage = '';
+  }
+
+
+
+  // sends invite for existing employee
+  sendEnableAccountInvite(): void {
+    this.errorMessage = '';
+    this.successMessage = '';
+
+    if (this.hasAppAccount()) {
+      this.errorMessage = 'This employee already has a login account.';
+      return;
+    }
+
+    const cleanEmail = this.enableAccountEmail.trim().toLowerCase();
+
+    if (!cleanEmail) {
+      this.errorMessage = 'Email is required to enable login account.';
+      return;
+    }
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+      this.errorMessage = 'Enter a valid email address.';
+      return;
+    }
+
+    this.isSendingInvite = true;
+
+    this.adminEmployeeService.enableEmployeeAccount(this.employee.emp_id, cleanEmail).subscribe({
+      next: (response) => {
+        this.isSendingInvite = false;
+
+        this.dialogRef.close({
+          refreshEmployees: true,
+          message: response.message || `Login account invite sent to ${cleanEmail}.`
+        });
+      },
+      error: (err) => {
+        console.error('Enable account invite error:', err);
+
+        this.isSendingInvite = false;
+
+        this.errorMessage =
+          err.error?.error ||
+          err.error?.message ||
+          'Could not enable login account for this employee.';
+      }
+    });
+  }
+
+
 
   private validateEmployee(): string {
     if (!this.employee.fname || !this.employee.fname.trim()) {
@@ -194,19 +294,27 @@ export class ManageEmployeeEditDialog {
     return '';
   }
 
+
+
   private findSelectedJob(): Job | undefined {
     return this.jobs.find(job =>
       Number(job.job_id) === Number(this.employee.job_id)
     );
   }
 
+
+
   private toBoolean(value: boolean | number | null): boolean {
     return value === true || value === 1;
   }
 
+
+
   hasAppAccount(): boolean {
     return this.employee.user_id !== null;
   }
+
+
 
   isEditingOwnAccount(): boolean {
     const employeeEmpId = this.employee.emp_id ? this.employee.emp_id.trim() : '';
@@ -222,6 +330,8 @@ export class ManageEmployeeEditDialog {
 
     return false;
   }
+
+
 
   private loadLoggedInUserFromLocalStorage(): void {
     if (typeof window === 'undefined') {

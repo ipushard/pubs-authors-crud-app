@@ -11,11 +11,21 @@
     </span>
   </div>
 
+
+
   @if (errorMessage) {
     <div class="dialog-error">
       {{ errorMessage }}
     </div>
   }
+
+  @if (successMessage) {
+    <div class="dialog-success">
+      {{ successMessage }}
+    </div>
+  }
+
+
 
   <div class="account-summary">
 
@@ -45,6 +55,8 @@
     </div>
 
   </div>
+
+
 
   <form class="dialog-form">
 
@@ -118,6 +130,8 @@
 
     </div>
 
+
+
     <div class="security-panel">
 
       <div class="security-title">
@@ -131,7 +145,18 @@
         </div>
       }
 
+
+
       @if (hasAppAccount()) {
+
+        <div class="account-info-box">
+          <strong>Login account is enabled.</strong>
+          <span>
+            This employee can use the application with email:
+            <strong>{{ employee.email }}</strong>
+          </span>
+        </div>
+
         <div class="toggle-grid">
 
           <div class="toggle-card admin-toggle">
@@ -173,20 +198,92 @@
           </div>
 
         </div>
+
       } @else {
+
         <div class="no-account-box">
-          This employee does not have a login account yet. Admin and active settings are only available for app users.
+          <strong>This employee does not have a login account yet.</strong>
+          <span>
+            Employee record can still exist without login access. Only an administrator can enable login access and send a registration invite.
+          </span>
         </div>
+
+        @if (!showEnableAccountForm) {
+          <div class="enable-account-actions">
+            <button
+              mat-flat-button
+              color="primary"
+              type="button"
+              [disabled]="isSendingInvite"
+              (click)="openEnableAccountForm()">
+              Enable Login Account
+            </button>
+          </div>
+        }
+
+        @if (showEnableAccountForm) {
+          <div class="enable-account-form">
+
+            <div class="enable-account-title">
+              <h4>Send Registration Invite</h4>
+              <p>
+                Enter the email address that this employee will use to register. The employee will receive a link and create their own password.
+              </p>
+            </div>
+
+            <mat-form-field appearance="outline" class="enable-email-field">
+              <mat-label>Employee Login Email</mat-label>
+              <input
+                matInput
+                type="email"
+                name="enableAccountEmail"
+                placeholder="employee@email.com"
+                [(ngModel)]="enableAccountEmail">
+            </mat-form-field>
+
+            <div class="enable-account-warning">
+              This will create an app login account for this existing employee and send a registration invite email.
+            </div>
+
+            <div class="enable-account-buttons">
+              <button
+                mat-stroked-button
+                type="button"
+                [disabled]="isSendingInvite"
+                (click)="cancelEnableAccountForm()">
+                Cancel Invite
+              </button>
+
+              <button
+                mat-flat-button
+                color="primary"
+                type="button"
+                [disabled]="isSendingInvite"
+                (click)="sendEnableAccountInvite()">
+                @if (isSendingInvite) {
+                  Sending Invite...
+                } @else {
+                  Send Invite
+                }
+              </button>
+            </div>
+
+          </div>
+        }
+
       }
 
     </div>
 
   </form>
 
+
+
   <div class="dialog-actions">
     <button
       mat-stroked-button
       type="button"
+      [disabled]="isSendingInvite"
       (click)="cancel()">
       Cancel
     </button>
@@ -195,6 +292,7 @@
       mat-flat-button
       color="primary"
       type="button"
+      [disabled]="isSendingInvite"
       (click)="saveChanges()">
       Save Changes
     </button>

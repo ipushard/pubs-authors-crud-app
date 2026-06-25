@@ -518,13 +518,24 @@ export class ManageEmployees implements OnInit {
       }
     });
 
-    dialogRef.afterClosed().subscribe((updateData: EmployeeUpdateRequest | null) => {
-      if (!updateData) {
-        return;
-      }
+   dialogRef.afterClosed().subscribe((result: any) => {
+  if (!result) {
+    return;
+  }
 
-      this.updateEmployee(employee.emp_id, updateData);
-    });
+  // this means the dialog enabled a login account and we only need to reload the table
+  if (result.refreshEmployees === true) {
+    this.successMessage = result.message || 'Employee account updated successfully.';
+    this.loadEmployees();
+    this.cdr.detectChanges();
+    return;
+  }
+
+  // normal employee edit save
+  const updateData: EmployeeUpdateRequest = result;
+
+  this.updateEmployee(employee.emp_id, updateData);
+});
   }
 
 
