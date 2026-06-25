@@ -4418,6 +4418,153 @@ app.post('/api/auth/login', async (req, res) => {
 
 
 
+// ADMIN ENABLE LOGIN ACCOUNT FOR EXISTING EMPLOYEE
+// this is used when employee already exists but does not have app login yet
+// admin enters email, system creates app_users record and sends invite email
+app.post('/api/admin/employees/:emp_id/enable-account', authenticateToken, requireAdmin, async (req, res) => {
+    try {
+        const empId = req.params.emp_id;
+
+        const {
+            email
+        } = req.body;
+
+        if (!empId || !email) {
+            return res.status(400).json({
+                message: 'Employee ID and email are required.'
+            });
+        }
+
+        const cleanEmpId = String(empId).trim();
+        const cleanEmail = String(email).trim().toLowerCase();
+
+        if (!cleanEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+            return res.status(400).json({
+                message: 'A valid email address is required.'
+            });
+        }
+
+        const pool = await sql.connect(dbConfig);
+
+        // check if employee exists
+        const employeeCheck = await pool.request()
+            .input('emp_id', sql.Char(9), cleanEmpId)
+            .query(`
+                SELECT
+                    emp_id,
+                    fname,
+                    minit,
+                    lname
+                FROM employee
+                WHERE emp_id = @emp_id
+            `);
+
+        if (employeeCheck.recordset.length === 0) {
+            return res.status(404).json({
+                message: 'Employee was not found.'
+            });
+        }
+
+        const employee = employeeCheck.recordset[0];
+
+        // check if this employee already has login account
+        const existingEmployeeAccountCheck = await pool.request()
+            .input('emp_id', sql.Char(9), cleanEmpId)
+            .query(`
+                SELECT
+                    user_id,
+                    email
+                FROM app_users
+                WHERE emp_id = @emp_id
+            `);
+
+        if (existingEmployeeAccountCheck.recordset.length > 0) {
+            return res.status(409).json({
+                message: 'This employee already has a login account.'
+            });
+        }
+
+        // check if email is already used by another account
+        const emailCheck = await pool.request()
+            .input('email', sql.VarChar(255), cleanEmail)
+            .query(`
+                SELECT
+                    user_id,
+                    email
+                FROM app_users
+                WHERE LOWER(email) = LOWER(@email)
+            `);
+
+        if (emailCheck.recordset.length > 0) {
+            return res.status(409).json({
+                message: 'This email already has an account.'
+            });
+        }
+
+        const inviteToken = crypto.randomBytes(32).toString('hex');
+
+        const employeeName = `${employee.fname} ${employee.lname}`;
+        const inviteLink = `${process.env.FRONTEND_URL}/register-invite?token=${inviteToken}`;
+
+        // create app login account for existing employee
+        await pool.request()
+            .input('emp_id', sql.Char(9), cleanEmpId)
+            .input('email', sql.VarChar(255), cleanEmail)
+            .input('invite_token', sql.VarChar(255), inviteToken)
+            .query(`
+                INSERT INTO app_users
+                    (
+                        emp_id,
+                        email,
+                        password_hash,
+                        email_confirmed,
+                        confirmation_token,
+                        is_admin,
+                        is_active,
+                        invite_token,
+                        invite_sent_at,
+                        password_set
+                    )
+                VALUES
+                    (
+                        @emp_id,
+                        @email,
+                        NULL,
+                        0,
+                        NULL,
+                        0,
+                        1,
+                        @invite_token,
+                        GETDATE(),
+                        0
+                    )
+            `);
+
+        console.log('Sending enable account invite to:', cleanEmail);
+        console.log('Invite link created:', inviteLink);
+
+        const emailDebug = await sendInviteEmail(cleanEmail, employeeName, inviteLink);
+
+        res.status(201).json({
+            message: `Login account invite sent to ${cleanEmail}.`,
+            inviteLink: inviteLink,
+            emailDebug: emailDebug
+        });
+
+    } catch (err) {
+        console.error('Enable employee account error:', err);
+
+        res.status(500).json({
+            message: 'Error enabling employee login account.',
+            error: err.message
+        });
+    }
+});
+
+
+
+
+
 
 
 
