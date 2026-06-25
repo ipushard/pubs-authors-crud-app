@@ -2,6 +2,8 @@ import { Component, ChangeDetectorRef, OnInit } from '@angular/core';
 import { DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 
+import { MatIconModule } from '@angular/material/icon';
+
 import { AdminTitleService } from '../services/admin-title';
 import { AdminPublisherService } from '../services/admin-publisher';
 
@@ -17,7 +19,8 @@ import { AdminPublisher } from '../models/admin-publisher';
   selector: 'app-manage-titles',
   imports: [
     FormsModule,
-    DatePipe
+    DatePipe,
+    MatIconModule
   ],
   templateUrl: './manage-titles.html',
   styleUrl: './manage-titles.css'
@@ -36,6 +39,9 @@ export class ManageTitles implements OnInit {
   // publishers used for dropdown
   publishers: AdminPublisher[] = [];
 
+
+
+  // filter and sort stuff
   searchTerm = '';
 
   selectedType = 'all';
@@ -48,6 +54,9 @@ export class ManageTitles implements OnInit {
 
   showFilters = false;
 
+
+
+  // page messages/loading
   errorMessage = '';
 
   successMessage = '';
@@ -56,6 +65,9 @@ export class ManageTitles implements OnInit {
 
   isSaving = false;
 
+
+
+  // form stuff
   showTitleForm = false;
 
   isEditMode = false;
@@ -82,6 +94,8 @@ export class ManageTitles implements OnInit {
 
   formPubDate = '';
 
+
+
   // dashboard numbers
   totalTitles = 0;
 
@@ -90,6 +104,8 @@ export class ManageTitles implements OnInit {
   totalYtdSales = 0;
 
   averagePrice = 0;
+
+
 
   // pagination variables
   currentPage = 1;
@@ -100,17 +116,33 @@ export class ManageTitles implements OnInit {
 
   totalPages = 1;
 
+
+
+  // this is for our nice delete popup
+  // no more ugly browser confirm
+  showConfirmModal = false;
+
+  // this remembers what title user clicked delete on
+  selectedTitleForDelete: AdminTitle | null = null;
+
+
+
   constructor(
     private adminTitleService: AdminTitleService,
     private adminPublisherService: AdminPublisherService,
     private cdr: ChangeDetectorRef
   ) {}
 
+
+
   ngOnInit(): void {
     this.loadTitles();
     this.loadPublishers();
   }
 
+
+
+  // load titles from backend api
   loadTitles(clearMessages: boolean = true): void {
     this.isLoading = true;
 
@@ -144,11 +176,15 @@ export class ManageTitles implements OnInit {
 
         this.errorMessage = 'Could not load titles. Make sure the backend server is running and your account has admin access.';
         this.isLoading = false;
+
         this.cdr.detectChanges();
       }
     });
   }
 
+
+
+  // load publishers for the title form dropdown
   loadPublishers(): void {
     this.adminPublisherService.getPublishers().subscribe({
       next: (data) => {
@@ -157,11 +193,14 @@ export class ManageTitles implements OnInit {
       },
       error: (err) => {
         console.error('Error loading publishers:', err);
+
         this.errorMessage = 'Could not load publishers for the title form.';
         this.cdr.detectChanges();
       }
     });
   }
+
+
 
   // this sets dashboard card numbers on top of page
   private setDashboardNumbers(): void {
@@ -191,16 +230,25 @@ export class ManageTitles implements OnInit {
     this.averagePrice = Math.round((totalPrice / pricedTitles.length) * 100) / 100;
   }
 
+
+
+  // open/close filter section
   toggleFilters(): void {
     this.showFilters = !this.showFilters;
     this.cdr.detectChanges();
   }
 
+
+
+  // clears green message when user starts doing new stuff
   clearSuccessMessage(): void {
     this.successMessage = '';
     this.cdr.detectChanges();
   }
 
+
+
+  // search/filter/sort title table
   applyFiltersAndSort(): void {
     const term = this.searchTerm.toLowerCase().trim();
 
@@ -242,6 +290,8 @@ export class ManageTitles implements OnInit {
     this.cdr.detectChanges();
   }
 
+
+
   clearFilters(): void {
     this.clearSuccessMessage();
 
@@ -254,6 +304,9 @@ export class ManageTitles implements OnInit {
     this.applyFiltersAndSort();
   }
 
+
+
+  // sorting logic for title table
   private sortTitles(a: AdminTitle, b: AdminTitle): number {
     switch (this.selectedSort) {
       case 'titleAsc':
@@ -303,10 +356,15 @@ export class ManageTitles implements OnInit {
     }
   }
 
+
+
   private compareText(a: string, b: string): number {
     return a.localeCompare(b);
   }
 
+
+
+  // update what titles show on page 1,2,3 etc
   updatePagedTitles(): void {
     this.totalPages = Math.ceil(this.filteredTitles.length / this.pageSize);
 
@@ -324,6 +382,8 @@ export class ManageTitles implements OnInit {
     this.pagedTitles = this.filteredTitles.slice(startIndex, endIndex);
   }
 
+
+
   changePage(page: number): void {
     if (page < 1 || page > this.totalPages) {
       return;
@@ -331,14 +391,20 @@ export class ManageTitles implements OnInit {
 
     this.currentPage = page;
     this.updatePagedTitles();
+
     this.cdr.detectChanges();
   }
+
+
 
   onPageSizeChange(): void {
     this.currentPage = 1;
     this.updatePagedTitles();
+
     this.cdr.detectChanges();
   }
+
+
 
   getPageNumbers(): number[] {
     const pages: number[] = [];
@@ -350,6 +416,8 @@ export class ManageTitles implements OnInit {
     return pages;
   }
 
+
+
   getStartRecordNumber(): number {
     if (this.filteredTitles.length === 0) {
       return 0;
@@ -358,12 +426,17 @@ export class ManageTitles implements OnInit {
     return (this.currentPage - 1) * this.pageSize + 1;
   }
 
+
+
   getEndRecordNumber(): number {
     const end = this.currentPage * this.pageSize;
 
     return Math.min(end, this.filteredTitles.length);
   }
 
+
+
+  // open create form
   openCreateForm(): void {
     this.errorMessage = '';
     this.successMessage = '';
@@ -386,6 +459,9 @@ export class ManageTitles implements OnInit {
     this.cdr.detectChanges();
   }
 
+
+
+  // open edit form and fill with selected title
   openEditForm(title: AdminTitle): void {
     this.errorMessage = '';
     this.successMessage = '';
@@ -408,6 +484,9 @@ export class ManageTitles implements OnInit {
     this.cdr.detectChanges();
   }
 
+
+
+  // cancel add/edit form
   cancelForm(): void {
     this.showTitleForm = false;
     this.isEditMode = false;
@@ -429,6 +508,9 @@ export class ManageTitles implements OnInit {
     this.cdr.detectChanges();
   }
 
+
+
+  // save button, this decides create or update
   saveTitle(): void {
     this.errorMessage = '';
     this.successMessage = '';
@@ -474,6 +556,9 @@ export class ManageTitles implements OnInit {
     this.createTitle(createData);
   }
 
+
+
+  // validation for title form
   private validateTitleForm(): string {
     if (!this.isEditMode && (!this.formTitleId || !this.formTitleId.trim())) {
       return 'Title ID is required.';
@@ -538,6 +623,9 @@ export class ManageTitles implements OnInit {
     return '';
   }
 
+
+
+  // optional text, if blank send null
   private cleanOptionalText(value: string): string | null {
     const cleanValue = value ? value.trim() : '';
 
@@ -548,6 +636,9 @@ export class ManageTitles implements OnInit {
     return cleanValue;
   }
 
+
+
+  // optional decimal number
   private cleanOptionalNumber(value: number | null): number | null {
     if (value === null || value === undefined) {
       return null;
@@ -562,6 +653,9 @@ export class ManageTitles implements OnInit {
     return numberValue;
   }
 
+
+
+  // optional whole number
   private cleanOptionalInteger(value: number | null): number | null {
     if (value === null || value === undefined) {
       return null;
@@ -576,11 +670,15 @@ export class ManageTitles implements OnInit {
     return Math.trunc(numberValue);
   }
 
+
+
   private getTodayForInput(): string {
     const today = new Date();
 
     return today.toISOString().slice(0, 10);
   }
+
+
 
   private formatDateForInput(value: string): string {
     if (!value) {
@@ -596,6 +694,9 @@ export class ManageTitles implements OnInit {
     return dateValue.toISOString().slice(0, 10);
   }
 
+
+
+  // create new title api call
   createTitle(titleData: TitleCreateRequest): void {
     this.isSaving = true;
 
@@ -626,6 +727,9 @@ export class ManageTitles implements OnInit {
     });
   }
 
+
+
+  // update existing title api call
   updateTitle(titleId: string, titleData: TitleUpdateRequest): void {
     this.isSaving = true;
 
@@ -656,25 +760,91 @@ export class ManageTitles implements OnInit {
     });
   }
 
+
+
+  // this opens our custom popup instead of ugly browser confirm
   deleteTitle(title: AdminTitle): void {
     this.errorMessage = '';
     this.successMessage = '';
 
-    const confirmed = confirm(
-      `Are you sure you want to delete this title?\n\n${title.title} (${title.title_id})\n\nIf sales, authors, or royalty schedules are connected to this title, the system will block the delete.`
-    );
+    this.selectedTitleForDelete = title;
+    this.showConfirmModal = true;
 
-    if (!confirmed) {
+    this.cdr.detectChanges();
+  }
+
+
+
+  // close custom delete popup
+  closeConfirmModal(): void {
+    this.showConfirmModal = false;
+    this.selectedTitleForDelete = null;
+
+    this.cdr.detectChanges();
+  }
+
+
+
+  getDeleteConfirmTitle(): string {
+    return 'Delete Title Record?';
+  }
+
+
+
+  getSelectedTitleName(): string {
+    if (!this.selectedTitleForDelete) {
+      return '';
+    }
+
+    return this.selectedTitleForDelete.title;
+  }
+
+
+
+  getSelectedTitleId(): string {
+    if (!this.selectedTitleForDelete) {
+      return '';
+    }
+
+    return this.selectedTitleForDelete.title_id;
+  }
+
+
+
+  getDeleteConfirmMessage(): string {
+    if (!this.selectedTitleForDelete) {
+      return '';
+    }
+
+    return 'This will permanently delete this title record. If sales, authors, or royalty schedules are connected to this title, the system will block the delete.';
+  }
+
+
+
+  // this runs only when user clicks delete in the custom popup
+  confirmDeleteTitle(): void {
+    if (!this.selectedTitleForDelete) {
       return;
     }
 
-    this.isSaving = true;
+    const titleToDelete = this.selectedTitleForDelete;
+    const titleName = titleToDelete.title;
+    const titleId = titleToDelete.title_id;
 
-    this.adminTitleService.deleteTitle(title.title_id).subscribe({
+    this.showConfirmModal = false;
+    this.selectedTitleForDelete = null;
+
+    this.isSaving = true;
+    this.errorMessage = '';
+    this.successMessage = '';
+
+    this.adminTitleService.deleteTitle(titleId).subscribe({
       next: (response) => {
         this.isSaving = false;
 
-        this.successMessage = response.message;
+        this.successMessage =
+          response.message ||
+          `Title ${titleName} (${titleId}) deleted successfully.`;
 
         this.loadTitles(false);
 

@@ -1,5 +1,6 @@
 <div class="manage-page">
 
+  <!-- top black header area -->
   <header class="page-header">
     <div>
       <h1>Manage Users / Employees</h1>
@@ -13,6 +14,9 @@
     </button>
   </header>
 
+
+
+  <!-- dashboard cards / quick numbers -->
   <section class="dashboard-grid">
 
     <div class="dashboard-card">
@@ -53,6 +57,9 @@
 
   </section>
 
+
+
+  <!-- messages -->
   @if (errorMessage) {
     <div class="message error-message">
       {{ errorMessage }}
@@ -73,10 +80,13 @@
 
   @if (isSaving) {
     <div class="message loading-message">
-      Saving employee changes...
+      Processing employee request...
     </div>
   }
 
+
+
+  <!-- filter area -->
   <section class="filter-card">
 
     <button class="filter-toggle" type="button" (click)="toggleFilters()">
@@ -164,6 +174,9 @@
 
   </section>
 
+
+
+  <!-- main table -->
   <section class="table-card">
 
     @if (!isLoading && filteredEmployees.length === 0) {
@@ -195,20 +208,50 @@
         @for (employee of pagedEmployees; track employee.emp_id) {
           <tr>
             <td>{{ employee.emp_id }}</td>
+
             <td>{{ getFullName(employee) | titlecase }}</td>
+
             <td>{{ employee.email || 'No app account' }}</td>
+
             <td>{{ employee.job_desc }}</td>
+
             <td>{{ employee.pub_name }} ({{ employee.pub_id }})</td>
+
             <td>{{ employee.hire_date | date:'mediumDate' }}</td>
+
             <td>
               <span class="status-badge" [class]="getAccountStatusClass(employee)">
                 {{ getAccountStatus(employee) }}
               </span>
             </td>
-            <td>{{ getYesNo(employee.email_confirmed) }}</td>
-            <td>{{ getYesNo(employee.is_admin) }}</td>
+
+            <td>
+  @if (getYesNo(employee.email_confirmed) === 'Yes') {
+    <span class="yes-no-badge yes-badge" title="Email confirmed">
+      <mat-icon>check</mat-icon>
+    </span>
+  } @else {
+    <span class="yes-no-badge no-badge" title="Email not confirmed">
+      <mat-icon>close</mat-icon>
+    </span>
+  }
+</td>
+
+<td>
+  @if (getYesNo(employee.is_admin) === 'Yes') {
+    <span class="yes-no-badge yes-badge" title="Admin user">
+      <mat-icon>check</mat-icon>
+    </span>
+  } @else {
+    <span class="yes-no-badge no-badge" title="Not admin">
+      <mat-icon>close</mat-icon>
+    </span>
+  }
+</td>
+
             <td>
               <div class="action-buttons">
+
                 <button
                   class="btn btn-small btn-edit"
                   type="button"
@@ -217,6 +260,7 @@
                   Edit
                 </button>
 
+                <!-- this opens our custom popup, not ugly browser confirm -->
                 <button
                   class="btn btn-small btn-danger"
                   type="button"
@@ -224,6 +268,7 @@
                   (click)="deleteEmployee(employee)">
                   Delete
                 </button>
+
               </div>
             </td>
           </tr>
@@ -237,6 +282,9 @@
       </tbody>
     </table>
 
+
+
+    <!-- pagination -->
     <div class="pagination-bar">
 
       <div class="pagination-info">
@@ -298,5 +346,59 @@
     </div>
 
   </section>
+
+
+
+  <!-- fancy delete popup -->
+  @if (showConfirmModal) {
+    <div class="confirm-overlay">
+
+      <div class="confirm-modal danger-modal">
+
+        <div class="confirm-icon danger-icon">
+          <mat-icon>delete_forever</mat-icon>
+        </div>
+
+        <h2>{{ getDeleteConfirmTitle() }}</h2>
+
+        <p class="confirm-name">
+          <strong>{{ getSelectedEmployeeName() }}</strong>
+        </p>
+
+        <p class="confirm-id">
+          Employee ID:
+          <strong>{{ getSelectedEmployeeId() }}</strong>
+        </p>
+
+        <p class="confirm-message">
+          {{ getDeleteConfirmMessage() }}
+        </p>
+
+        <div class="confirm-warning">
+          This will remove the employee record and the app user login account connected to it.
+        </div>
+
+        <div class="confirm-actions">
+          <button
+            class="btn btn-secondary"
+            type="button"
+            [disabled]="isSaving"
+            (click)="closeConfirmModal()">
+            Cancel
+          </button>
+
+          <button
+            class="btn btn-danger"
+            type="button"
+            [disabled]="isSaving"
+            (click)="confirmDeleteEmployee()">
+            Delete Employee
+          </button>
+        </div>
+
+      </div>
+
+    </div>
+  }
 
 </div>

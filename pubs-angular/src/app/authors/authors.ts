@@ -1,210 +1,215 @@
-//ChangeDetectorRef lets us manually tell Angular to refresh the HTML if needed
-import { Component, OnInit, ChangeDetectorRef,HostListener } from '@angular/core';
+import { Component, OnInit, ChangeDetectorRef, HostListener } from '@angular/core';
+import { CommonModule, TitleCasePipe, UpperCasePipe } from '@angular/common';
 import { AuthorService } from '../services/author';
 import { Author } from '../models/author';
 import { RouterLink, ActivatedRoute, Router } from '@angular/router';
-
-import { TitleCasePipe, UpperCasePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MatIconModule } from '@angular/material/icon';
+import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 
-//componenet decorator
 @Component({
-selector: 'app-authors',
-imports: [RouterLink, TitleCasePipe, UpperCasePipe, FormsModule,MatIconModule],
-templateUrl: './authors.html',
-styleUrl: './authors.css'
+  selector: 'app-authors',
+  imports: [
+    CommonModule,
+    RouterLink,
+    TitleCasePipe,
+    UpperCasePipe,
+    FormsModule,
+    MatIconModule,
+    MatSlideToggleModule
+  ],
+  templateUrl: './authors.html',
+  styleUrl: './authors.css'
 })
 export class Authors implements OnInit {
 
-// BUNCH OF VARS THAT I USE THRO THE PROGRAM
-//store authors in array
-authors: Author[] = [];
+  authors: Author[] = [];
 
-// sort variables
-filteredAuthors: Author[] = [];
+  filteredAuthors: Author[] = [];
 
-searchTerm = '';
+  searchTerm = '';
 
-selectedContract = 'all';
+  selectedContract = 'all';
 
-selectedState = 'all';
+  selectedState = 'all';
 
-availableStates: string[] = [];
+  availableStates: string[] = [];
 
-selectedSort = 'lastNameAsc';
+  selectedSort = 'lastNameAsc';
 
-showFilters = false;
+  showFilters = false;
 
-recordStatus = 'all';
+  recordStatus = 'all';
 
-//declare var for storing the error message
-errorMessage: string = '';
+  errorMessage = '';
 
-successMessage: string = '';
+  successMessage = '';
 
-isLoading = false;
+  isLoading = false;
 
-// dashboard card numbers
-// this is for small numbers on top of tabel
-totalAuthors = 0;
+  totalAuthors = 0;
 
-activeAuthors = 0;
+  activeAuthors = 0;
 
-archivedAuthors = 0;
+  archivedAuthors = 0;
 
-contractSigned = 0;
+  contractSigned = 0;
 
-contractNotSigned = 0;
+  contractNotSigned = 0;
 
-// confirmation modal variables
-// this is for custom archive and unarchive popup
-showConfirmModal = false;
+  showConfirmModal = false;
 
-confirmAction = '';
+  confirmAction = '';
 
-selectedAuthorId = '';
+  selectedAuthorId = '';
 
-selectedAuthorName = '';
+  selectedAuthorName = '';
 
-// pagination variables
-pagedAuthors: Author[] = [];
+  pagedAuthors: Author[] = [];
 
-currentPage = 1;
+  currentPage = 1;
 
-pageSize = 10;
+  pageSize = 10;
 
-pageSizeOptions = [5, 10, 20, 50];
+  pageSizeOptions = [5, 10, 20, 50];
 
-totalPages = 1;
+  totalPages = 1;
 
-// variable for drop down 
-showSortOptions = false;
+  showSortOptions = false;
 
+  constructor(
+    private authorService: AuthorService,
+    private cdr: ChangeDetectorRef,
+    private route: ActivatedRoute,
+    private router: Router
+  ) {}
 
+  ngOnInit(): void {
+    this.loadAuthors();
+  }
 
+  @HostListener('document:click', ['$event'])
+  closeSortWhenClickOutside(event: MouseEvent): void {
+    const clickedElement = event.target as HTMLElement;
 
+    if (!clickedElement.closest('.custom-sort')) {
+      this.showSortOptions = false;
+      this.cdr.detectChanges();
+    }
+  }
 
-
-// injecting AuthorSercice and ChangeDetectorRef into the constructor
-// injecting ChangeDet here becase this allows me to force angular to refresh
-constructor(
-private authorService: AuthorService,
-private cdr: ChangeDetectorRef,
-private route: ActivatedRoute,
-private router: Router
-) {}
-
-
-
-
-//runs automaticly when component loads and loads out tabel
-ngOnInit(): void {
-this.loadAuthors();
-}
-
-
-
-// close sort drop down when user click outside of it
-@HostListener('document:click', ['$event'])
-closeSortWhenClickOutside(event: MouseEvent): void {
-  const clickedElement = event.target as HTMLElement;
-
-  if (!clickedElement.closest('.custom-sort')) {
-    this.showSortOptions = false;
+  toggleFilters(): void {
+    this.clearSuccessMessage();
+    this.showFilters = !this.showFilters;
     this.cdr.detectChanges();
   }
-}
 
+  clearSuccessMessage(): void {
+    this.successMessage = '';
+    this.cdr.detectChanges();
+  }
 
+  toggleSortOptions(): void {
+    this.clearSuccessMessage();
+    this.showSortOptions = !this.showSortOptions;
+    this.cdr.detectChanges();
+  }
 
+  selectSortOption(sortValue: string): void {
+    this.clearSuccessMessage();
+    this.selectedSort = sortValue;
+    this.showSortOptions = false;
+    this.applyFiltersAndSort();
+  }
 
+                private showCreateSuccessMessage(): void {
+                const urlParams = new URLSearchParams(window.location.search);
 
-// togle
-toggleFilters(): void {
-this.clearSuccessMessage();
-this.showFilters = !this.showFilters;
-this.cdr.detectChanges();
-}
+                const createdAuthorName = urlParams.get('createdAuthorName');
+                const createdAuthorId = urlParams.get('createdAuthorId');
 
+                const updatedAuthorName = urlParams.get('updatedAuthorName');
+                const updatedAuthorId = urlParams.get('updatedAuthorId');
 
+                if (createdAuthorName && createdAuthorId) {
+                  this.successMessage =
+                    `Author ${createdAuthorName} (${createdAuthorId}) created successfully.`;
+                } else if (updatedAuthorName && updatedAuthorId) {
+                  this.successMessage =
+                    `Author ${updatedAuthorName} (${updatedAuthorId}) modified successfully.`;
+                } else {
+                  return;
+                }
 
+                this.cdr.detectChanges();
 
+                // clean url after message is picked up
+                window.history.replaceState({}, '', '/authors');
 
-// clear sucess message when user starts doing another action
-clearSuccessMessage(): void {
-this.successMessage = '';
-this.cdr.detectChanges();
-}
+                // keep message for 10 seconds
+                setTimeout(() => {
+                  this.successMessage = '';
+                  this.cdr.detectChanges();
+                }, 10000);
+              }
 
+  loadAuthors(): void {
+    console.log('loadAuthors method called');
 
+    this.isLoading = true;
+    this.errorMessage = '';
 
-// methods for drop down splitting 
-toggleSortOptions(): void {
-this.clearSuccessMessage();
-this.showSortOptions = !this.showSortOptions;
-this.cdr.detectChanges();
-}
+    this.authorService.getAuthors(this.recordStatus).subscribe({
+      next: (data) => {
+        this.authors = data;
 
-selectSortOption(sortValue: string): void {
-this.clearSuccessMessage();
-this.selectedSort = sortValue;
-this.showSortOptions = false;
-this.applyFiltersAndSort();
-}
+        this.setDashboardNumbers(data);
+        this.setAvailableStates(data);
 
+        this.applyFiltersAndSort();
 
+        this.isLoading = false;
 
+        console.log('API data:', data);
+        console.log('Component authors:', this.authors);
+        console.log('Component authors length:', this.authors.length);
 
+        this.showCreateSuccessMessage();
 
-// show sucess message after creating new author
-private showCreateSuccessMessage(): void {
-const urlParams = new URLSearchParams(window.location.search);
+        this.cdr.detectChanges();
+      },
+      error: (err) => {
+        console.error('Error loading authors:', err);
 
-const createdAuthorName = urlParams.get('createdAuthorName');
-const createdAuthorId = urlParams.get('createdAuthorId');
+        this.errorMessage = 'Could not load authors. Make sure the backend server is running.';
+        this.isLoading = false;
 
-if (!createdAuthorName || !createdAuthorId) {
-return;
-}
+        this.cdr.detectChanges();
+      }
+    });
+  }
 
-this.successMessage =
-`Author ${createdAuthorName} (${createdAuthorId}) created successfully.`;
-
-this.cdr.detectChanges();
-
-// clean url so message does not show again after refresh
-window.history.replaceState({}, '', '/authors');
-
-// hide sucess message after 10  sec
-setTimeout(() => {
-this.successMessage = '';
-this.cdr.detectChanges();
-}, 10000);
-
-}
-
-loadAuthors(): void {
-
-
-//check
-console.log('loadAuthors method called');
-
-this.isLoading = true;
-this.errorMessage = '';
-
-//call the getAuthors method from the service and subscribe to the observable 
-// SENDS GET REQUEST TO out http
-this.authorService.getAuthors(this.recordStatus).subscribe({
-  next: (data) => {
-    this.authors = data;
-
+  private setDashboardNumbers(data: Author[]): void {
     this.totalAuthors = data.length;
-    this.activeAuthors = data.filter(author => author.is_active === true).length;
-    this.archivedAuthors = data.filter(author => author.is_active === false).length;
-    this.contractSigned = data.filter(author => author.contract === true).length;
-    this.contractNotSigned = data.filter(author => author.contract === false).length;
 
+    this.activeAuthors = data.filter(author =>
+      this.isAuthorActive(author)
+    ).length;
+
+    this.archivedAuthors = data.filter(author =>
+      !this.isAuthorActive(author)
+    ).length;
+
+    this.contractSigned = data.filter(author =>
+      author.contract === true
+    ).length;
+
+    this.contractNotSigned = data.filter(author =>
+      author.contract === false
+    ).length;
+  }
+
+  private setAvailableStates(data: Author[]): void {
     this.availableStates = [
       ...new Set(
         data
@@ -213,401 +218,392 @@ this.authorService.getAuthors(this.recordStatus).subscribe({
           .map(state => state.toUpperCase())
       )
     ].sort();
+  }
 
-    this.applyFiltersAndSort();
+  isAuthorActive(author: Author): boolean {
+    return author.is_active === true || Number(author.is_active) === 1;
+  }
 
-    this.isLoading = false;
+  onRecordStatusChange(): void {
+    this.currentPage = 1;
+    this.clearSuccessMessage();
+    this.loadAuthors();
+  }
 
-    console.log('API data:', data);
-    console.log('Component authors:', this.authors);
-    console.log('Component authors length:', this.authors.length);
+  onAuthorActiveToggle(author: Author, isChecked: boolean): void {
+    this.errorMessage = '';
+    this.successMessage = '';
 
-    
-        this.showCreateSuccessMessage();
+    const authorName = `${author.au_fname} ${author.au_lname}`;
+
+    this.authorService.updateAuthorStatus(author.au_id, isChecked).subscribe({
+      next: (response) => {
+        this.successMessage =
+          response.message ||
+          `Author ${authorName} (${author.au_id}) status updated successfully.`;
+
+        author.is_active = isChecked;
+
+        this.loadAuthors();
 
         this.cdr.detectChanges();
-
-  },
-
-  //if api fails log error and set error message to display in html
-  error: (err) => {
-    console.error('Error loading authors:', err);
-    this.errorMessage = 'Could not load authors. Make sure the backend server is running.';
-    this.isLoading = false;
-    this.cdr.detectChanges();
-  }
-});
-
-
-}
-
-//record status change method
-onRecordStatusChange(): void {
-this.currentPage = 1;
-this.clearSuccessMessage();
-this.loadAuthors();
-}
-
-// unarchive emthod
-onUnarchiveAuthor(id: string): void {
-const author = this.authors.find(author => author.au_id === id);
-
-this.selectedAuthorId = id;
-this.selectedAuthorName = author
-? `${author.au_fname} ${author.au_lname}`
-: 'Selected author';
-
-this.confirmAction = 'unarchive';
-this.showConfirmModal = true;
-
-this.errorMessage = '';
-this.successMessage = '';
-
-this.cdr.detectChanges();
-}
-
-// filter method
-applyFiltersAndSort(): void {
-const term = this.searchTerm.toLowerCase().trim();
-
-
-let result = [...this.authors];
-
-if (term) {
-  result = result.filter(author =>
-    author.au_id.toLowerCase().includes(term) ||
-    author.au_fname.toLowerCase().includes(term) ||
-    author.au_lname.toLowerCase().includes(term) ||
-    author.phone.toLowerCase().includes(term) ||
-    (author.address ?? '').toLowerCase().includes(term) ||
-    (author.city ?? '').toLowerCase().includes(term) ||
-    (author.state ?? '').toLowerCase().includes(term) ||
-    (author.zip ?? '').toLowerCase().includes(term)
-  );
-}
-
-if (this.selectedContract === 'yes') {
-  result = result.filter(author => author.contract === true);
-}
-
-if (this.selectedContract === 'no') {
-  result = result.filter(author => author.contract === false);
-}
-
-if (this.selectedState !== 'all') {
-  result = result.filter(author =>
-    (author.state ?? '').toUpperCase() === this.selectedState
-  );
-}
-
-result.sort((a, b) => this.sortAuthors(a, b));
-
-this.filteredAuthors = result;
-
- this.currentPage = 1;
-
-this.updatePagedAuthors();
-
-    this.cdr.detectChanges();
-
-
-}
-
-clearFilters(): void {
-this.clearSuccessMessage();
-this.searchTerm = '';
-this.selectedContract = 'all';
-this.selectedState = 'all';
-this.selectedSort = 'lastNameAsc';
-this.currentPage = 1;
-
-this.applyFiltersAndSort();
-}
-
-private sortAuthors(a: Author, b: Author): number {
-switch (this.selectedSort) {
-case 'lastNameAsc':
-return this.compareText(a.au_lname, b.au_lname);
-
-
-  case 'lastNameDesc':
-    return this.compareText(b.au_lname, a.au_lname);
-
-  case 'firstNameAsc':
-    return this.compareText(a.au_fname, b.au_fname);
-
-  case 'firstNameDesc':
-    return this.compareText(b.au_fname, a.au_fname);
-
-  case 'cityAsc':
-    return this.compareText(a.city ?? '', b.city ?? '');
-
-  case 'cityDesc':
-    return this.compareText(b.city ?? '', a.city ?? '');
-
-  case 'stateAsc':
-    return this.compareText(a.state ?? '', b.state ?? '');
-
-  case 'stateDesc':
-    return this.compareText(b.state ?? '', a.state ?? '');
-
-  case 'contractYesFirst':
-    return Number(b.contract) - Number(a.contract);
-
-  case 'contractNoFirst':
-    return Number(a.contract) - Number(b.contract);
-
-  default:
-    return this.compareText(a.au_lname, b.au_lname);
-}
-
-
-}
-
-private compareText(valueA: string, valueB: string): number {
-return valueA.toLowerCase().localeCompare(valueB.toLowerCase());
-}
-
-onDeleteAuthor(id: string): void {
-const author = this.authors.find(author => author.au_id === id);
-
-this.selectedAuthorId = id;
-this.selectedAuthorName = author
-? `${author.au_fname} ${author.au_lname}`
-: 'Selected author';
-
-this.confirmAction = 'archive';
-this.showConfirmModal = true;
-
-this.errorMessage = '';
-this.successMessage = '';
-
-this.cdr.detectChanges();
-}
-
-// close modal if user press cancel
-closeConfirmModal(): void {
-this.showConfirmModal = false;
-this.confirmAction = '';
-this.selectedAuthorId = '';
-this.selectedAuthorName = '';
-
-this.cdr.detectChanges();
-}
-
-// this runs after user press main button in custom pop up
-confirmAuthorAction(): void {
-if (!this.selectedAuthorId) {
-return;
-}
-
-if (this.confirmAction === 'archive') {
-this.archiveAuthor(this.selectedAuthorId);
-return;
-}
-
-if (this.confirmAction === 'unarchive') {
-this.unarchiveAuthor(this.selectedAuthorId);
-return;
-}
-}
-
-// title for custom popup
-getConfirmTitle(): string {
-if (this.confirmAction === 'archive') {
-return 'Archive Author Record?';
-}
-
-if (this.confirmAction === 'unarchive') {
-return 'Restore Author Record?';
-}
-
-return '';
-}
-
-// message for custom popup
-getConfirmMessage(): string {
-if (this.confirmAction === 'archive') {
-return 'This will not permanently delete the author. You can restore this record later from Archived Records.';
-}
-
-if (this.confirmAction === 'unarchive') {
-return 'This will move the author back to Active Records.';
-}
-
-return '';
-}
-
-// main button text for custom popup
-getConfirmButtonText(): string {
-if (this.confirmAction === 'archive') {
-return 'Archive Author';
-}
-
-if (this.confirmAction === 'unarchive') {
-return 'Restore Author';
-}
-
-return '';
-}
-
-// this is real archive api call after user confirm in custom popup
-private archiveAuthor(id: string): void {
-this.showConfirmModal = false;
-this.errorMessage = '';
-this.successMessage = '';
-
-const authorName = this.selectedAuthorName || 'Selected author';
-
-this.authorService.deleteAuthor(id).subscribe({
-next: () => {
-console.log('Author archived:', id);
-
-
-  this.errorMessage = '';
-  this.successMessage =
-    `Author ${authorName} (${id}) archived successfully. You can restore it from Archived Records.`;
-
-  this.confirmAction = '';
-  this.selectedAuthorId = '';
-  this.selectedAuthorName = '';
-
-  //reload the table after archive so the archived record disappears.
-  this.loadAuthors();
-
-  //rorce angular to refresh the page after archive.
-  this.cdr.detectChanges();
-},
-
-error: (err) => {
-  console.error('Error archiving author:', err);
-
-  if (err.status === 409) {
-    this.errorMessage =
-      err.error?.message ||
-      'This author cannot be archived because they are connected to other database records.';
-  } else if (err.status === 404) {
-    this.errorMessage =
-      'Author not found. It may have already been archived.';
-  } else if (err.status === 0) {
-    this.errorMessage =
-      'Cannot connect to backend API. Make sure the Node server is running.';
-  } else {
-    this.errorMessage =
-      err.error?.message ||
-      'Could not archive author. Please try again.';
+      },
+      error: (err) => {
+        console.error('Error updating author status:', err);
+
+        this.errorMessage =
+          err.error?.message ||
+          'Could not update author status. Please try again.';
+
+        this.loadAuthors();
+
+        this.cdr.detectChanges();
+      }
+    });
   }
 
-  this.confirmAction = '';
-  this.selectedAuthorId = '';
-  this.selectedAuthorName = '';
+  applyFiltersAndSort(): void {
+    const term = this.searchTerm.toLowerCase().trim();
 
-  //force angular to show the error message immediately.
-  this.cdr.detectChanges();
-}
+    let result = [...this.authors];
 
+    if (term) {
+      result = result.filter(author =>
+        author.au_id.toLowerCase().includes(term) ||
+        author.au_fname.toLowerCase().includes(term) ||
+        author.au_lname.toLowerCase().includes(term) ||
+        author.phone.toLowerCase().includes(term) ||
+        (author.address ?? '').toLowerCase().includes(term) ||
+        (author.city ?? '').toLowerCase().includes(term) ||
+        (author.state ?? '').toLowerCase().includes(term) ||
+        (author.zip ?? '').toLowerCase().includes(term)
+      );
+    }
 
-});
-}
+    if (this.selectedContract === 'yes') {
+      result = result.filter(author => author.contract === true);
+    }
 
-// this is real unarchive api call after user confirm in custom popup
-private unarchiveAuthor(id: string): void {
-this.showConfirmModal = false;
-this.errorMessage = '';
-this.successMessage = '';
+    if (this.selectedContract === 'no') {
+      result = result.filter(author => author.contract === false);
+    }
 
-const authorName = this.selectedAuthorName || 'Selected author';
+    if (this.selectedState !== 'all') {
+      result = result.filter(author =>
+        (author.state ?? '').toUpperCase() === this.selectedState
+      );
+    }
 
-this.authorService.unarchiveAuthor(id).subscribe({
-next: () => {
-this.successMessage =
-`Author ${authorName} (${id}) unarchived successfully. The record is active again.`;
+    result.sort((a, b) => this.sortAuthors(a, b));
 
-  this.confirmAction = '';
-  this.selectedAuthorId = '';
-  this.selectedAuthorName = '';
+    this.filteredAuthors = result;
 
-  this.loadAuthors();
-  this.cdr.detectChanges();
-},
-error: (err) => {
-  console.error('Error unarchiving author:', err);
-  this.errorMessage = err.error?.message || 'Could not unarchive author. Please try again.';
+    this.currentPage = 1;
 
-  this.confirmAction = '';
-  this.selectedAuthorId = '';
-  this.selectedAuthorName = '';
+    this.updatePagedAuthors();
 
-  this.cdr.detectChanges();
-}
+    this.cdr.detectChanges();
+  }
 
+  clearFilters(): void {
+    this.clearSuccessMessage();
 
-});
-}
+    this.searchTerm = '';
+    this.selectedContract = 'all';
+    this.selectedState = 'all';
+    this.selectedSort = 'lastNameAsc';
+    this.currentPage = 1;
 
-updatePagedAuthors(): void {
-const size = Number(this.pageSize);
+    this.applyFiltersAndSort();
+  }
 
-this.totalPages = Math.ceil(this.filteredAuthors.length / size);
+  private sortAuthors(a: Author, b: Author): number {
+    switch (this.selectedSort) {
+      case 'lastNameAsc':
+        return this.compareText(a.au_lname, b.au_lname);
 
-if (this.totalPages === 0) {
-this.totalPages = 1;
-}
+      case 'lastNameDesc':
+        return this.compareText(b.au_lname, a.au_lname);
 
-if (this.currentPage > this.totalPages) {
-this.currentPage = this.totalPages;
-}
+      case 'firstNameAsc':
+        return this.compareText(a.au_fname, b.au_fname);
 
-const startIndex = (this.currentPage - 1) * size;
-const endIndex = startIndex + size;
+      case 'firstNameDesc':
+        return this.compareText(b.au_fname, a.au_fname);
 
-this.pagedAuthors = this.filteredAuthors.slice(startIndex, endIndex);
+      case 'cityAsc':
+        return this.compareText(a.city ?? '', b.city ?? '');
 
-this.cdr.detectChanges();
-}
+      case 'cityDesc':
+        return this.compareText(b.city ?? '', a.city ?? '');
 
-changePage(page: number): void {
-if (page < 1 || page > this.totalPages) {
-return;
-}
+      case 'stateAsc':
+        return this.compareText(a.state ?? '', b.state ?? '');
 
-this.clearSuccessMessage();
-this.currentPage = page;
-this.updatePagedAuthors();
-}
+      case 'stateDesc':
+        return this.compareText(b.state ?? '', a.state ?? '');
 
-onPageSizeChange(): void {
-this.clearSuccessMessage();
-this.currentPage = 1;
-this.updatePagedAuthors();
-}
+      case 'contractYesFirst':
+        return Number(b.contract) - Number(a.contract);
 
-getPageNumbers(): number[] {
-const pages: number[] = [];
+      case 'contractNoFirst':
+        return Number(a.contract) - Number(b.contract);
 
-for (let i = 1; i <= this.totalPages; i++) {
-pages.push(i);
-}
+      default:
+        return this.compareText(a.au_lname, b.au_lname);
+    }
+  }
 
-return pages;
-}
+  private compareText(valueA: string, valueB: string): number {
+    return valueA.toLowerCase().localeCompare(valueB.toLowerCase());
+  }
 
-getStartRecordNumber(): number {
-if (this.filteredAuthors.length === 0) {
-return 0;
-}
+  onDeleteAuthor(id: string): void {
+    const author = this.authors.find(author => author.au_id === id);
 
-return (this.currentPage - 1) * this.pageSize + 1;
-}
+    this.selectedAuthorId = id;
 
-getEndRecordNumber(): number {
-const end = this.currentPage * this.pageSize;
+    this.selectedAuthorName = author
+      ? `${author.au_fname} ${author.au_lname}`
+      : 'Selected author';
 
-if (end > this.filteredAuthors.length) {
-return this.filteredAuthors.length;
-}
+    this.confirmAction = 'delete';
+    this.showConfirmModal = true;
 
-return end;
-}
+    this.errorMessage = '';
+    this.successMessage = '';
 
+    this.cdr.detectChanges();
+  }
+
+  closeConfirmModal(): void {
+    this.showConfirmModal = false;
+    this.confirmAction = '';
+    this.selectedAuthorId = '';
+    this.selectedAuthorName = '';
+
+    this.cdr.detectChanges();
+  }
+
+  confirmAuthorAction(): void {
+    if (!this.selectedAuthorId) {
+      return;
+    }
+
+    if (this.confirmAction === 'delete') {
+      this.deleteAuthor(this.selectedAuthorId);
+      return;
+    }
+
+    if (this.confirmAction === 'archive') {
+      this.updateAuthorStatusFromOldAction(this.selectedAuthorId, false);
+      return;
+    }
+
+    if (this.confirmAction === 'unarchive') {
+      this.updateAuthorStatusFromOldAction(this.selectedAuthorId, true);
+      return;
+    }
+  }
+
+  getConfirmTitle(): string {
+    if (this.confirmAction === 'delete') {
+      return 'Delete Author Record?';
+    }
+
+    if (this.confirmAction === 'archive') {
+      return 'Mark Author as Inactive?';
+    }
+
+    if (this.confirmAction === 'unarchive') {
+      return 'Mark Author as Active?';
+    }
+
+    return '';
+  }
+
+  getConfirmMessage(): string {
+    if (this.confirmAction === 'delete') {
+      return 'This will permanently delete this author from the database. This action cannot be undone. If the author is connected to title records, the system will block the delete.';
+    }
+
+    if (this.confirmAction === 'archive') {
+      return 'This will mark the author as inactive. The record will stay in the database.';
+    }
+
+    if (this.confirmAction === 'unarchive') {
+      return 'This will mark the author as active again.';
+    }
+
+    return '';
+  }
+
+  getConfirmButtonText(): string {
+    if (this.confirmAction === 'delete') {
+      return 'Delete Author';
+    }
+
+    if (this.confirmAction === 'archive') {
+      return 'Mark Inactive';
+    }
+
+    if (this.confirmAction === 'unarchive') {
+      return 'Mark Active';
+    }
+
+    return '';
+  }
+
+  private deleteAuthor(id: string): void {
+    this.showConfirmModal = false;
+    this.errorMessage = '';
+    this.successMessage = '';
+
+    const authorName = this.selectedAuthorName || 'Selected author';
+
+    this.authorService.deleteAuthor(id).subscribe({
+      next: (response) => {
+        console.log('Author deleted:', id);
+
+        this.successMessage =
+          response.message ||
+          `Author ${authorName} (${id}) deleted successfully.`;
+
+        this.confirmAction = '';
+        this.selectedAuthorId = '';
+        this.selectedAuthorName = '';
+
+        this.loadAuthors();
+
+        this.cdr.detectChanges();
+      },
+      error: (err) => {
+        console.error('Error deleting author:', err);
+
+        if (err.status === 400 || err.status === 409) {
+          this.errorMessage =
+            err.error?.message ||
+            'This author cannot be deleted because they are connected to other database records.';
+        } else if (err.status === 404) {
+          this.errorMessage =
+            'Author not found. It may have already been deleted.';
+        } else if (err.status === 0) {
+          this.errorMessage =
+            'Cannot connect to backend API. Make sure the Node server is running.';
+        } else {
+          this.errorMessage =
+            err.error?.message ||
+            'Could not delete author. Please try again.';
+        }
+
+        this.confirmAction = '';
+        this.selectedAuthorId = '';
+        this.selectedAuthorName = '';
+
+        this.cdr.detectChanges();
+      }
+    });
+  }
+
+  private updateAuthorStatusFromOldAction(id: string, isActive: boolean): void {
+    this.showConfirmModal = false;
+    this.errorMessage = '';
+    this.successMessage = '';
+
+    const authorName = this.selectedAuthorName || 'Selected author';
+
+    this.authorService.updateAuthorStatus(id, isActive).subscribe({
+      next: (response) => {
+        this.successMessage =
+          response.message ||
+          `Author ${authorName} (${id}) status updated successfully.`;
+
+        this.confirmAction = '';
+        this.selectedAuthorId = '';
+        this.selectedAuthorName = '';
+
+        this.loadAuthors();
+
+        this.cdr.detectChanges();
+      },
+      error: (err) => {
+        console.error('Error updating author status:', err);
+
+        this.errorMessage =
+          err.error?.message ||
+          'Could not update author status. Please try again.';
+
+        this.confirmAction = '';
+        this.selectedAuthorId = '';
+        this.selectedAuthorName = '';
+
+        this.cdr.detectChanges();
+      }
+    });
+  }
+
+  updatePagedAuthors(): void {
+    const size = Number(this.pageSize);
+
+    this.totalPages = Math.ceil(this.filteredAuthors.length / size);
+
+    if (this.totalPages === 0) {
+      this.totalPages = 1;
+    }
+
+    if (this.currentPage > this.totalPages) {
+      this.currentPage = this.totalPages;
+    }
+
+    const startIndex = (this.currentPage - 1) * size;
+    const endIndex = startIndex + size;
+
+    this.pagedAuthors = this.filteredAuthors.slice(startIndex, endIndex);
+
+    this.cdr.detectChanges();
+  }
+
+  changePage(page: number): void {
+    if (page < 1 || page > this.totalPages) {
+      return;
+    }
+
+    this.clearSuccessMessage();
+    this.currentPage = page;
+    this.updatePagedAuthors();
+  }
+
+  onPageSizeChange(): void {
+    this.clearSuccessMessage();
+    this.currentPage = 1;
+    this.updatePagedAuthors();
+  }
+
+  getPageNumbers(): number[] {
+    const pages: number[] = [];
+
+    for (let i = 1; i <= this.totalPages; i++) {
+      pages.push(i);
+    }
+
+    return pages;
+  }
+
+  getStartRecordNumber(): number {
+    if (this.filteredAuthors.length === 0) {
+      return 0;
+    }
+
+    return (this.currentPage - 1) * this.pageSize + 1;
+  }
+
+  getEndRecordNumber(): number {
+    const end = this.currentPage * this.pageSize;
+
+    if (end > this.filteredAuthors.length) {
+      return this.filteredAuthors.length;
+    }
+
+    return end;
+  }
 }

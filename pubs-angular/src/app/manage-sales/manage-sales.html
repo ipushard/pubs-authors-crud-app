@@ -1,5 +1,6 @@
 <div class="manage-page">
 
+  <!-- top black header -->
   <header class="page-header">
     <div>
       <h1>Sales Management</h1>
@@ -13,6 +14,9 @@
     </button>
   </header>
 
+
+
+  <!-- dashboard cards -->
   <section class="dashboard-grid">
 
     <div class="dashboard-card">
@@ -41,6 +45,9 @@
 
   </section>
 
+
+
+  <!-- messages -->
   @if (errorMessage) {
     <div class="message error-message">
       {{ errorMessage }}
@@ -65,23 +72,87 @@
     </div>
   }
 
-  @if (showSaleForm) {
-    <section class="form-card">
 
-      <div class="form-header">
-        @if (isEditMode) {
-          <h2>Edit Order Item</h2>
+
+  <!-- sales form -->
+  <!-- this class is used by TS to scroll user here -->
+  @if (showSaleForm) {
+    <section class="form-card sale-form-anchor">
+
+      <div class="form-header sales-form-header">
+        <div>
+          <h2>{{ getAddItemsOrderTitle() }}</h2>
           <p>
-            Store, order number, and title are locked because the Pubs sales table uses them as the order item key.
+            {{ getAddItemsOrderSubText() }}
           </p>
+        </div>
+
+        @if (isAddingToExistingOrder) {
+          <span class="sale-mode-badge add-mode-badge">
+            Adding Items
+          </span>
+        } @else if (isEditMode) {
+          <span class="sale-mode-badge edit-mode-badge">
+            Editing Item
+          </span>
         } @else {
-          <h2>Create Sales Order</h2>
-          <p>
-            Create one order with one or more title items.
-          </p>
+          <span class="sale-mode-badge create-mode-badge">
+            New Order
+          </span>
         }
       </div>
 
+
+
+      <!-- when user clicks Add Item on existing order, show clear context -->
+      @if (isAddingToExistingOrder) {
+        @if (selectedOrderForAddingItems; as addOrder) {
+          <div class="add-existing-card">
+
+            <div class="add-existing-header">
+              <div>
+                <h3>Existing Order Selected</h3>
+                <p>
+                  You are adding new title items to this same order, not creating a separate order.
+                </p>
+              </div>
+
+              <strong>
+                {{ addOrder.ord_num }}
+              </strong>
+            </div>
+
+            <div class="add-existing-grid">
+
+              <div class="add-existing-item">
+                <span>Store</span>
+                <strong>{{ addOrder.stor_name || addOrder.stor_id }}</strong>
+              </div>
+
+              <div class="add-existing-item">
+                <span>Current Items</span>
+                <strong>{{ addOrder.line_count }}</strong>
+              </div>
+
+              <div class="add-existing-item">
+                <span>Current Qty</span>
+                <strong>{{ addOrder.total_qty }}</strong>
+              </div>
+
+              <div class="add-existing-item">
+                <span>Current Amount</span>
+                <strong>{{ getOrderRevenue(addOrder) | currency:'USD':'symbol':'1.2-2' }}</strong>
+              </div>
+
+            </div>
+
+          </div>
+        }
+      }
+
+
+
+      <!-- order info -->
       <div class="form-grid">
 
         <label>
@@ -131,48 +202,74 @@
 
       </div>
 
+
+
+      <!-- edit one item mode -->
       @if (formMode === 'editLine') {
-        <div class="form-grid">
+        <div class="line-items-card">
 
-          <label class="title-field">
-            Title
-            <select
-              class="filter-input"
-              disabled
-              [(ngModel)]="formTitleId">
-              <option value="">Select Title</option>
+          <div class="line-items-header">
+            <div>
+              <h3>Edit Existing Item</h3>
+              <p>
+                Title is locked because the sales table uses store, order number, and title as the key.
+              </p>
+            </div>
+          </div>
 
-              @for (title of titles; track title.title_id) {
-                <option [value]="title.title_id">
-                  {{ title.title }} - {{ title.pub_name || title.pub_id }} ({{ title.title_id }})
-                </option>
-              }
-            </select>
-          </label>
+          <div class="form-grid">
 
-          <label>
-            Quantity
-            <input
-              type="number"
-              class="filter-input"
-              min="1"
-              step="1"
-              placeholder="1"
-              [(ngModel)]="formQty">
-          </label>
+            <label class="title-field">
+              Title
+              <select
+                class="filter-input"
+                disabled
+                [(ngModel)]="formTitleId">
+                <option value="">Select Title</option>
+
+                @for (title of titles; track title.title_id) {
+                  <option [value]="title.title_id">
+                    {{ title.title }} - {{ title.pub_name || title.pub_id }} ({{ title.title_id }})
+                  </option>
+                }
+              </select>
+            </label>
+
+            <label>
+              Quantity
+              <input
+                type="number"
+                class="filter-input"
+                min="1"
+                step="1"
+                placeholder="1"
+                [(ngModel)]="formQty">
+            </label>
+
+          </div>
 
         </div>
       }
 
+
+
+      <!-- create order OR add items to existing order -->
       @if (formMode === 'createOrder') {
         <div class="line-items-card">
 
           <div class="line-items-header">
             <div>
-              <h3>Order Items</h3>
-              <p>
-                Add each title that belongs to this order.
-              </p>
+              @if (isAddingToExistingOrder) {
+                <h3>New Items To Add</h3>
+                <p>
+                  Select the new titles and quantities that should be added to this existing order.
+                </p>
+              } @else {
+                <h3>Order Items</h3>
+                <p>
+                  Add each title that belongs to this new order.
+                </p>
+              }
             </div>
 
             <button
@@ -233,24 +330,79 @@
 
           </div>
 
+          @if (isAddingToExistingOrder) {
+            <div class="small-warning-box">
+              If this title already exists in the order, edit the existing item quantity instead of adding it again.
+            </div>
+          }
+
         </div>
       }
 
-      <div class="estimated-box">
-        <span class="estimated-label">
-          @if (formMode === 'editLine') {
-            Estimated Item Total
-          } @else {
-            Estimated Order Total
-          }
-        </span>
 
-        <strong>{{ getFormEstimatedRevenue() | currency:'USD':'symbol':'1.2-2' }}</strong>
 
-        <span class="estimated-note">
-          Title price × quantity
-        </span>
+      <!-- live totals -->
+      <div class="estimated-grid">
+
+        <div class="estimated-box">
+          <span class="estimated-label">
+            @if (formMode === 'editLine') {
+              Estimated Item Total
+            } @else {
+              New Items Total
+            }
+          </span>
+
+          <strong>{{ getFormEstimatedRevenue() | currency:'USD':'symbol':'1.2-2' }}</strong>
+
+          <span class="estimated-note">
+            Title price × quantity
+          </span>
+        </div>
+
+        @if (formMode === 'createOrder') {
+          <div class="estimated-box">
+            <span class="estimated-label">
+              New Quantity
+            </span>
+
+            <strong>{{ getFormItemsQty() }}</strong>
+
+            <span class="estimated-note">
+              quantity being added
+            </span>
+          </div>
+        }
+
+        @if (isAddingToExistingOrder) {
+          <div class="estimated-box projected-box">
+            <span class="estimated-label">
+              Projected Order Amount
+            </span>
+
+            <strong>{{ getProjectedOrderRevenue() | currency:'USD':'symbol':'1.2-2' }}</strong>
+
+            <span class="estimated-note">
+              current order + new items
+            </span>
+          </div>
+
+          <div class="estimated-box projected-box">
+            <span class="estimated-label">
+              Projected Order Quantity
+            </span>
+
+            <strong>{{ getProjectedOrderQty() }}</strong>
+
+            <span class="estimated-note">
+              current qty + new qty
+            </span>
+          </div>
+        }
+
       </div>
+
+
 
       <div class="form-actions">
         <button
@@ -268,6 +420,8 @@
           (click)="saveSale()">
           @if (isEditMode) {
             Save Item Changes
+          } @else if (isAddingToExistingOrder) {
+            Add Items To Order
           } @else {
             Create Order
           }
@@ -277,6 +431,9 @@
     </section>
   }
 
+
+
+  <!-- filter area -->
   <section class="filter-card">
 
     <button class="filter-toggle" type="button" (click)="toggleFilters()">
@@ -401,9 +558,13 @@
 
   </section>
 
+
+
+  <!-- order details panel -->
+  <!-- this class is used by TS to scroll user here when View Items is clicked -->
   @if (showOrderDetailsPanel) {
     @if (selectedOrderDetails; as order) {
-      <section class="summary-card">
+      <section class="summary-card order-details-anchor">
 
         <div class="summary-header">
           <div>
@@ -551,9 +712,13 @@
     }
   }
 
+
+
+  <!-- summary panel -->
+  <!-- this class is used by TS to scroll user here when Summary is clicked -->
   @if (showSummaryPanel) {
     @if (selectedOrderForSummary; as order) {
-      <section class="summary-card">
+      <section class="summary-card summary-panel-anchor">
 
         <div class="summary-header">
           <div>
@@ -703,6 +868,9 @@
     }
   }
 
+
+
+  <!-- main sales order table -->
   <section class="table-card">
 
     @if (!isLoading && filteredOrders.length === 0) {
@@ -798,6 +966,9 @@
       </tbody>
     </table>
 
+
+
+    <!-- pagination -->
     <div class="pagination-bar">
 
       <div class="pagination-info">
@@ -859,5 +1030,62 @@
     </div>
 
   </section>
+
+
+
+  <!-- fancy delete popup -->
+  @if (showConfirmModal) {
+    <div class="confirm-overlay">
+
+      <div class="confirm-modal danger-modal">
+
+        <div class="confirm-icon danger-icon">
+          <mat-icon>delete_forever</mat-icon>
+        </div>
+
+        <h2>{{ getDeleteConfirmTitle() }}</h2>
+
+        <p class="confirm-name">
+          <strong>{{ getDeleteConfirmName() }}</strong>
+        </p>
+
+        <p class="confirm-id">
+          {{ getDeleteConfirmId() }}
+        </p>
+
+        <p class="confirm-message">
+          {{ getDeleteConfirmMessage() }}
+        </p>
+
+        <div class="confirm-warning">
+          {{ getDeleteConfirmWarning() }}
+        </div>
+
+        <div class="confirm-actions">
+          <button
+            class="btn btn-secondary"
+            type="button"
+            [disabled]="isSaving"
+            (click)="closeConfirmModal()">
+            Cancel
+          </button>
+
+          <button
+            class="btn btn-danger"
+            type="button"
+            [disabled]="isSaving"
+            (click)="confirmDeleteSalesAction()">
+            @if (confirmDeleteType === 'order') {
+              Delete Order
+            } @else {
+              Delete Item
+            }
+          </button>
+        </div>
+
+      </div>
+
+    </div>
+  }
 
 </div>

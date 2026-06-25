@@ -1,6 +1,8 @@
 import { Component, ChangeDetectorRef, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
+import { MatIconModule } from '@angular/material/icon';
+
 import { AdminPublisherService } from '../services/admin-publisher';
 import {
   AdminPublisher,
@@ -11,7 +13,8 @@ import {
 @Component({
   selector: 'app-manage-publishers',
   imports: [
-    FormsModule
+    FormsModule,
+    MatIconModule
   ],
   templateUrl: './manage-publishers.html',
   styleUrl: './manage-publishers.css'
@@ -27,12 +30,18 @@ export class ManagePublishers implements OnInit {
   // publishers shown on current page
   pagedPublishers: AdminPublisher[] = [];
 
+
+
+  // filter and sort vars
   searchTerm = '';
 
   selectedSort = 'nameAsc';
 
   showFilters = false;
 
+
+
+  // messages and loading vars
   errorMessage = '';
 
   successMessage = '';
@@ -41,6 +50,9 @@ export class ManagePublishers implements OnInit {
 
   isSaving = false;
 
+
+
+  // form vars
   showPublisherForm = false;
 
   isEditMode = false;
@@ -57,6 +69,8 @@ export class ManagePublishers implements OnInit {
 
   formCountry = '';
 
+
+
   // dashboard numbers
   totalPublishers = 0;
 
@@ -65,6 +79,8 @@ export class ManagePublishers implements OnInit {
   publishersWithState = 0;
 
   publishersWithCountry = 0;
+
+
 
   // pagination variables
   currentPage = 1;
@@ -75,15 +91,31 @@ export class ManagePublishers implements OnInit {
 
   totalPages = 1;
 
+
+
+  // this is for our custom delete popup
+  // no more ugly browser confirm for publishers
+  showConfirmModal = false;
+
+  // this remembers what publisher user clicked delete on
+  selectedPublisherForDelete: AdminPublisher | null = null;
+
+
+
   constructor(
     private adminPublisherService: AdminPublisherService,
     private cdr: ChangeDetectorRef
   ) {}
 
+
+
   ngOnInit(): void {
     this.loadPublishers();
   }
 
+
+
+  // load publishers from backend api
   loadPublishers(clearMessages: boolean = true): void {
     this.isLoading = true;
 
@@ -109,10 +141,13 @@ export class ManagePublishers implements OnInit {
 
         this.errorMessage = 'Could not load publishers. Make sure the backend server is running and your account has admin access.';
         this.isLoading = false;
+
         this.cdr.detectChanges();
       }
     });
   }
+
+
 
   // this sets dashboard card numbers on top of page
   private setDashboardNumbers(): void {
@@ -131,16 +166,25 @@ export class ManagePublishers implements OnInit {
     ).length;
   }
 
+
+
+  // open/close filter section
   toggleFilters(): void {
     this.showFilters = !this.showFilters;
     this.cdr.detectChanges();
   }
 
+
+
+  // clears green success message when user starts another action
   clearSuccessMessage(): void {
     this.successMessage = '';
     this.cdr.detectChanges();
   }
 
+
+
+  // filter and sort publishers table
   applyFiltersAndSort(): void {
     const term = this.searchTerm.toLowerCase().trim();
 
@@ -167,6 +211,8 @@ export class ManagePublishers implements OnInit {
     this.cdr.detectChanges();
   }
 
+
+
   clearFilters(): void {
     this.clearSuccessMessage();
 
@@ -177,6 +223,9 @@ export class ManagePublishers implements OnInit {
     this.applyFiltersAndSort();
   }
 
+
+
+  // sorting logic for publisher table
   private sortPublishers(a: AdminPublisher, b: AdminPublisher): number {
     switch (this.selectedSort) {
       case 'nameAsc':
@@ -208,10 +257,15 @@ export class ManagePublishers implements OnInit {
     }
   }
 
+
+
   private compareText(a: string, b: string): number {
     return a.localeCompare(b);
   }
 
+
+
+  // update what publishers show on page 1,2,3 etc
   updatePagedPublishers(): void {
     this.totalPages = Math.ceil(this.filteredPublishers.length / this.pageSize);
 
@@ -229,6 +283,8 @@ export class ManagePublishers implements OnInit {
     this.pagedPublishers = this.filteredPublishers.slice(startIndex, endIndex);
   }
 
+
+
   changePage(page: number): void {
     if (page < 1 || page > this.totalPages) {
       return;
@@ -236,14 +292,20 @@ export class ManagePublishers implements OnInit {
 
     this.currentPage = page;
     this.updatePagedPublishers();
+
     this.cdr.detectChanges();
   }
+
+
 
   onPageSizeChange(): void {
     this.currentPage = 1;
     this.updatePagedPublishers();
+
     this.cdr.detectChanges();
   }
+
+
 
   getPageNumbers(): number[] {
     const pages: number[] = [];
@@ -255,6 +317,8 @@ export class ManagePublishers implements OnInit {
     return pages;
   }
 
+
+
   getStartRecordNumber(): number {
     if (this.filteredPublishers.length === 0) {
       return 0;
@@ -263,12 +327,17 @@ export class ManagePublishers implements OnInit {
     return (this.currentPage - 1) * this.pageSize + 1;
   }
 
+
+
   getEndRecordNumber(): number {
     const end = this.currentPage * this.pageSize;
 
     return Math.min(end, this.filteredPublishers.length);
   }
 
+
+
+  // open create form
   openCreateForm(): void {
     this.errorMessage = '';
     this.successMessage = '';
@@ -286,6 +355,9 @@ export class ManagePublishers implements OnInit {
     this.cdr.detectChanges();
   }
 
+
+
+  // open edit form and fill it with selected publisher
   openEditForm(publisher: AdminPublisher): void {
     this.errorMessage = '';
     this.successMessage = '';
@@ -303,6 +375,9 @@ export class ManagePublishers implements OnInit {
     this.cdr.detectChanges();
   }
 
+
+
+  // cancel add/edit form
   cancelForm(): void {
     this.showPublisherForm = false;
     this.isEditMode = false;
@@ -319,6 +394,9 @@ export class ManagePublishers implements OnInit {
     this.cdr.detectChanges();
   }
 
+
+
+  // save button, this decides create or update
   savePublisher(): void {
     this.errorMessage = '';
     this.successMessage = '';
@@ -354,6 +432,9 @@ export class ManagePublishers implements OnInit {
     this.createPublisher(createData);
   }
 
+
+
+  // publisher form validation
   private validatePublisherForm(): string {
     if (!this.isEditMode && (!this.formPubId || !this.formPubId.trim())) {
       return 'Publisher ID is required.';
@@ -386,6 +467,9 @@ export class ManagePublishers implements OnInit {
     return '';
   }
 
+
+
+  // if optional field is blank, send null to backend
   private cleanOptionalText(value: string): string | null {
     const cleanValue = value ? value.trim() : '';
 
@@ -396,6 +480,9 @@ export class ManagePublishers implements OnInit {
     return cleanValue;
   }
 
+
+
+  // create new publisher api call
   createPublisher(publisherData: PublisherCreateRequest): void {
     this.isSaving = true;
 
@@ -426,6 +513,9 @@ export class ManagePublishers implements OnInit {
     });
   }
 
+
+
+  // update existing publisher api call
   updatePublisher(pubId: string, publisherData: PublisherUpdateRequest): void {
     this.isSaving = true;
 
@@ -456,25 +546,91 @@ export class ManagePublishers implements OnInit {
     });
   }
 
+
+
+  // this opens our custom popup instead of ugly browser confirm
   deletePublisher(publisher: AdminPublisher): void {
     this.errorMessage = '';
     this.successMessage = '';
 
-    const confirmed = confirm(
-      `Are you sure you want to delete this publisher?\n\n${publisher.pub_name} (${publisher.pub_id})\n\nIf employees or titles are assigned to this publisher, the system will block the delete.`
-    );
+    this.selectedPublisherForDelete = publisher;
+    this.showConfirmModal = true;
 
-    if (!confirmed) {
+    this.cdr.detectChanges();
+  }
+
+
+
+  // close custom delete popup
+  closeConfirmModal(): void {
+    this.showConfirmModal = false;
+    this.selectedPublisherForDelete = null;
+
+    this.cdr.detectChanges();
+  }
+
+
+
+  getDeleteConfirmTitle(): string {
+    return 'Delete Publisher Record?';
+  }
+
+
+
+  getSelectedPublisherName(): string {
+    if (!this.selectedPublisherForDelete) {
+      return '';
+    }
+
+    return this.selectedPublisherForDelete.pub_name;
+  }
+
+
+
+  getSelectedPublisherId(): string {
+    if (!this.selectedPublisherForDelete) {
+      return '';
+    }
+
+    return this.selectedPublisherForDelete.pub_id;
+  }
+
+
+
+  getDeleteConfirmMessage(): string {
+    if (!this.selectedPublisherForDelete) {
+      return '';
+    }
+
+    return 'This will permanently delete this publisher record. If employees, titles, or publisher info are connected to this publisher, the system will block the delete.';
+  }
+
+
+
+  // this runs only when user clicks delete in the custom popup
+  confirmDeletePublisher(): void {
+    if (!this.selectedPublisherForDelete) {
       return;
     }
 
-    this.isSaving = true;
+    const publisherToDelete = this.selectedPublisherForDelete;
+    const publisherName = publisherToDelete.pub_name;
+    const publisherId = publisherToDelete.pub_id;
 
-    this.adminPublisherService.deletePublisher(publisher.pub_id).subscribe({
+    this.showConfirmModal = false;
+    this.selectedPublisherForDelete = null;
+
+    this.isSaving = true;
+    this.errorMessage = '';
+    this.successMessage = '';
+
+    this.adminPublisherService.deletePublisher(publisherId).subscribe({
       next: (response) => {
         this.isSaving = false;
 
-        this.successMessage = response.message;
+        this.successMessage =
+          response.message ||
+          `Publisher ${publisherName} (${publisherId}) deleted successfully.`;
 
         this.loadPublishers(false);
 

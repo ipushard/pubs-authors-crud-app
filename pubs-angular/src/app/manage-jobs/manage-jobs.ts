@@ -1,13 +1,16 @@
 import { Component, ChangeDetectorRef, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
+import { MatIconModule } from '@angular/material/icon';
+
 import { AdminJobService } from '../services/admin-job';
 import { AdminJob, JobCreateRequest, JobUpdateRequest } from '../models/admin-job';
 
 @Component({
   selector: 'app-manage-jobs',
   imports: [
-    FormsModule
+    FormsModule,
+    MatIconModule
   ],
   templateUrl: './manage-jobs.html',
   styleUrl: './manage-jobs.css'
@@ -23,12 +26,18 @@ export class ManageJobs implements OnInit {
   // jobs shown on current page
   pagedJobs: AdminJob[] = [];
 
+
+
+  // filter and sort vars
   searchTerm = '';
 
   selectedSort = 'idAsc';
 
   showFilters = false;
 
+
+
+  // messages and loading vars
   errorMessage = '';
 
   successMessage = '';
@@ -37,6 +46,9 @@ export class ManageJobs implements OnInit {
 
   isSaving = false;
 
+
+
+  // form vars
   showJobForm = false;
 
   isEditMode = false;
@@ -49,6 +61,8 @@ export class ManageJobs implements OnInit {
 
   formMaxLevel: number | null = null;
 
+
+
   // dashboard numbers
   totalJobs = 0;
 
@@ -57,6 +71,8 @@ export class ManageJobs implements OnInit {
   highestMaxLevel = 0;
 
   averageLevelRange = 0;
+
+
 
   // pagination variables
   currentPage = 1;
@@ -67,44 +83,63 @@ export class ManageJobs implements OnInit {
 
   totalPages = 1;
 
+
+
+  // this is for our custom delete popup
+  // no more ugly browser confirm for deleting jobs
+  showConfirmModal = false;
+
+  // this remembers what job user clicked delete on
+  selectedJobForDelete: AdminJob | null = null;
+
+
+
   constructor(
     private adminJobService: AdminJobService,
     private cdr: ChangeDetectorRef
   ) {}
 
+
+
   ngOnInit(): void {
     this.loadJobs();
   }
 
-  loadJobs(clearMessages: boolean = true): void {
-  this.isLoading = true;
 
-  if (clearMessages) {
-    this.errorMessage = '';
-    this.successMessage = '';
-  } else {
-    this.errorMessage = '';
+
+  // load jobs from backend api
+  loadJobs(clearMessages: boolean = true): void {
+    this.isLoading = true;
+
+    if (clearMessages) {
+      this.errorMessage = '';
+      this.successMessage = '';
+    } else {
+      this.errorMessage = '';
+    }
+
+    this.adminJobService.getJobs().subscribe({
+      next: (data) => {
+        this.jobs = data;
+
+        this.setDashboardNumbers();
+        this.applyFiltersAndSort();
+
+        this.isLoading = false;
+        this.cdr.detectChanges();
+      },
+      error: (err) => {
+        console.error('Error loading jobs:', err);
+
+        this.errorMessage = 'Could not load jobs. Make sure the backend server is running and your account has admin access.';
+        this.isLoading = false;
+
+        this.cdr.detectChanges();
+      }
+    });
   }
 
-  this.adminJobService.getJobs().subscribe({
-    next: (data) => {
-      this.jobs = data;
 
-      this.setDashboardNumbers();
-      this.applyFiltersAndSort();
-
-      this.isLoading = false;
-      this.cdr.detectChanges();
-    },
-    error: (err) => {
-      console.error('Error loading jobs:', err);
-
-      this.errorMessage = 'Could not load jobs. Make sure the backend server is running and your account has admin access.';
-      this.isLoading = false;
-      this.cdr.detectChanges();
-    }
-  });
-}
 
   // this sets dashboard card numbers on top of page
   private setDashboardNumbers(): void {
@@ -127,16 +162,25 @@ export class ManageJobs implements OnInit {
     this.averageLevelRange = Math.round(totalRange / this.jobs.length);
   }
 
+
+
+  // open and close filter section
   toggleFilters(): void {
     this.showFilters = !this.showFilters;
     this.cdr.detectChanges();
   }
 
+
+
+  // clear success message after user starts doing something else
   clearSuccessMessage(): void {
     this.successMessage = '';
     this.cdr.detectChanges();
   }
 
+
+
+  // filter and sort jobs table
   applyFiltersAndSort(): void {
     const term = this.searchTerm.toLowerCase().trim();
 
@@ -162,6 +206,8 @@ export class ManageJobs implements OnInit {
     this.cdr.detectChanges();
   }
 
+
+
   clearFilters(): void {
     this.clearSuccessMessage();
 
@@ -172,6 +218,9 @@ export class ManageJobs implements OnInit {
     this.applyFiltersAndSort();
   }
 
+
+
+  // sort jobs depending on dropdown
   private sortJobs(a: AdminJob, b: AdminJob): number {
     switch (this.selectedSort) {
       case 'idAsc':
@@ -203,10 +252,15 @@ export class ManageJobs implements OnInit {
     }
   }
 
+
+
   private compareText(a: string, b: string): number {
     return a.localeCompare(b);
   }
 
+
+
+  // update what jobs show on the current page
   updatePagedJobs(): void {
     this.totalPages = Math.ceil(this.filteredJobs.length / this.pageSize);
 
@@ -224,6 +278,8 @@ export class ManageJobs implements OnInit {
     this.pagedJobs = this.filteredJobs.slice(startIndex, endIndex);
   }
 
+
+
   changePage(page: number): void {
     if (page < 1 || page > this.totalPages) {
       return;
@@ -231,14 +287,20 @@ export class ManageJobs implements OnInit {
 
     this.currentPage = page;
     this.updatePagedJobs();
+
     this.cdr.detectChanges();
   }
+
+
 
   onPageSizeChange(): void {
     this.currentPage = 1;
     this.updatePagedJobs();
+
     this.cdr.detectChanges();
   }
+
+
 
   getPageNumbers(): number[] {
     const pages: number[] = [];
@@ -250,6 +312,8 @@ export class ManageJobs implements OnInit {
     return pages;
   }
 
+
+
   getStartRecordNumber(): number {
     if (this.filteredJobs.length === 0) {
       return 0;
@@ -258,12 +322,17 @@ export class ManageJobs implements OnInit {
     return (this.currentPage - 1) * this.pageSize + 1;
   }
 
+
+
   getEndRecordNumber(): number {
     const end = this.currentPage * this.pageSize;
 
     return Math.min(end, this.filteredJobs.length);
   }
 
+
+
+  // open create form
   openCreateForm(): void {
     this.errorMessage = '';
     this.successMessage = '';
@@ -279,6 +348,9 @@ export class ManageJobs implements OnInit {
     this.cdr.detectChanges();
   }
 
+
+
+  // open edit form and fill it with selected job
   openEditForm(job: AdminJob): void {
     this.errorMessage = '';
     this.successMessage = '';
@@ -294,6 +366,9 @@ export class ManageJobs implements OnInit {
     this.cdr.detectChanges();
   }
 
+
+
+  // cancel add/edit form
   cancelForm(): void {
     this.showJobForm = false;
     this.isEditMode = false;
@@ -308,6 +383,9 @@ export class ManageJobs implements OnInit {
     this.cdr.detectChanges();
   }
 
+
+
+  // save button, this decides create or update
   saveJob(): void {
     this.errorMessage = '';
     this.successMessage = '';
@@ -334,6 +412,9 @@ export class ManageJobs implements OnInit {
     this.createJob(jobData);
   }
 
+
+
+  // validation for job form
   private validateJobForm(): string {
     if (!this.formJobDesc || !this.formJobDesc.trim()) {
       return 'Job description is required.';
@@ -369,102 +450,174 @@ export class ManageJobs implements OnInit {
     return '';
   }
 
+
+
+  // create new job api call
   createJob(jobData: JobCreateRequest): void {
-  this.isSaving = true;
+    this.isSaving = true;
 
-  this.adminJobService.createJob(jobData).subscribe({
-    next: (response) => {
-      this.isSaving = false;
+    this.adminJobService.createJob(jobData).subscribe({
+      next: (response) => {
+        this.isSaving = false;
 
-      this.cancelForm();
+        this.cancelForm();
 
-      this.successMessage = response.message;
+        this.successMessage = response.message;
 
-      this.loadJobs(false);
+        this.loadJobs(false);
 
-      this.cdr.detectChanges();
-    },
-    error: (err) => {
-      console.error('Error creating job:', err);
+        this.cdr.detectChanges();
+      },
+      error: (err) => {
+        console.error('Error creating job:', err);
 
-      this.isSaving = false;
+        this.isSaving = false;
 
-      this.errorMessage =
-        err.error?.error ||
-        err.error?.message ||
-        'Could not create job.';
+        this.errorMessage =
+          err.error?.error ||
+          err.error?.message ||
+          'Could not create job.';
 
-      this.cdr.detectChanges();
-    }
-  });
-}
-
-  updateJob(jobId: number, jobData: JobUpdateRequest): void {
-  this.isSaving = true;
-
-  this.adminJobService.updateJob(jobId, jobData).subscribe({
-    next: (response) => {
-      this.isSaving = false;
-
-      this.cancelForm();
-
-      this.successMessage = response.message;
-
-      this.loadJobs(false);
-
-      this.cdr.detectChanges();
-    },
-    error: (err) => {
-      console.error('Error updating job:', err);
-
-      this.isSaving = false;
-
-      this.errorMessage =
-        err.error?.error ||
-        err.error?.message ||
-        'Could not update job.';
-
-      this.cdr.detectChanges();
-    }
-  });
-}
-
-  deleteJob(job: AdminJob): void {
-  this.errorMessage = '';
-  this.successMessage = '';
-
-  const confirmed = confirm(
-    `Are you sure you want to delete this job?\n\n${job.job_desc} (${job.job_id})\n\nIf employees are assigned to this job, the system will block the delete.`
-  );
-
-  if (!confirmed) {
-    return;
+        this.cdr.detectChanges();
+      }
+    });
   }
 
-  this.isSaving = true;
 
-  this.adminJobService.deleteJob(job.job_id).subscribe({
-    next: (response) => {
-      this.isSaving = false;
 
-      this.successMessage = response.message;
+  // update existing job api call
+  updateJob(jobId: number, jobData: JobUpdateRequest): void {
+    this.isSaving = true;
 
-      this.loadJobs(false);
+    this.adminJobService.updateJob(jobId, jobData).subscribe({
+      next: (response) => {
+        this.isSaving = false;
 
-      this.cdr.detectChanges();
-    },
-    error: (err) => {
-      console.error('Error deleting job:', err);
+        this.cancelForm();
 
-      this.isSaving = false;
+        this.successMessage = response.message;
 
-      this.errorMessage =
-        err.error?.error ||
-        err.error?.message ||
-        'Could not delete job.';
+        this.loadJobs(false);
 
-      this.cdr.detectChanges();
+        this.cdr.detectChanges();
+      },
+      error: (err) => {
+        console.error('Error updating job:', err);
+
+        this.isSaving = false;
+
+        this.errorMessage =
+          err.error?.error ||
+          err.error?.message ||
+          'Could not update job.';
+
+        this.cdr.detectChanges();
+      }
+    });
+  }
+
+
+
+  // this opens our custom popup instead of ugly browser confirm
+  deleteJob(job: AdminJob): void {
+    this.errorMessage = '';
+    this.successMessage = '';
+
+    this.selectedJobForDelete = job;
+    this.showConfirmModal = true;
+
+    this.cdr.detectChanges();
+  }
+
+
+
+  // close delete popup
+  closeConfirmModal(): void {
+    this.showConfirmModal = false;
+    this.selectedJobForDelete = null;
+
+    this.cdr.detectChanges();
+  }
+
+
+
+  getDeleteConfirmTitle(): string {
+    return 'Delete Job Record?';
+  }
+
+
+
+  getSelectedJobName(): string {
+    if (!this.selectedJobForDelete) {
+      return '';
     }
-  });
-}
+
+    return this.selectedJobForDelete.job_desc;
+  }
+
+
+
+  getSelectedJobId(): string {
+    if (!this.selectedJobForDelete) {
+      return '';
+    }
+
+    return String(this.selectedJobForDelete.job_id);
+  }
+
+
+
+  getDeleteConfirmMessage(): string {
+    if (!this.selectedJobForDelete) {
+      return '';
+    }
+
+    return 'This will permanently delete this job record. If employees are assigned to this job, the system will block the delete.';
+  }
+
+
+
+  // this runs only when user clicks delete in the custom modal
+  confirmDeleteJob(): void {
+    if (!this.selectedJobForDelete) {
+      return;
+    }
+
+    const jobToDelete = this.selectedJobForDelete;
+    const jobName = jobToDelete.job_desc;
+    const jobId = jobToDelete.job_id;
+
+    this.showConfirmModal = false;
+    this.selectedJobForDelete = null;
+
+    this.isSaving = true;
+    this.errorMessage = '';
+    this.successMessage = '';
+
+    this.adminJobService.deleteJob(jobId).subscribe({
+      next: (response) => {
+        this.isSaving = false;
+
+        this.successMessage =
+          response.message ||
+          `Job ${jobName} (${jobId}) deleted successfully.`;
+
+        this.loadJobs(false);
+
+        this.cdr.detectChanges();
+      },
+      error: (err) => {
+        console.error('Error deleting job:', err);
+
+        this.isSaving = false;
+
+        this.errorMessage =
+          err.error?.error ||
+          err.error?.message ||
+          'Could not delete job.';
+
+        this.cdr.detectChanges();
+      }
+    });
+  }
 }

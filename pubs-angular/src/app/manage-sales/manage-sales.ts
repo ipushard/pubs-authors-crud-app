@@ -2,6 +2,8 @@ import { Component, ChangeDetectorRef, OnInit } from '@angular/core';
 import { CommonModule, CurrencyPipe, DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 
+import { MatIconModule } from '@angular/material/icon';
+
 import { AdminSaleService } from '../services/admin-sale';
 
 import {
@@ -22,37 +24,51 @@ interface SalesOrderFormLine {
 
 type SalesFormMode = 'createOrder' | 'editLine';
 
+type SalesDeleteTarget = 'line' | 'order';
+
 @Component({
   selector: 'app-manage-sales',
   imports: [
     CommonModule,
     FormsModule,
     DatePipe,
-    CurrencyPipe
+    CurrencyPipe,
+    MatIconModule
   ],
   templateUrl: './manage-sales.html',
   styleUrl: './manage-sales.css'
 })
 export class ManageSales implements OnInit {
 
+  // all single sales lines from database
   sales: AdminSale[] = [];
 
+  // grouped sales orders from database
   orders: SalesOrder[] = [];
 
   filteredOrders: SalesOrder[] = [];
 
   pagedOrders: SalesOrder[] = [];
 
+
+
+  // keeping this because some older logic / reports still use sale lines
   filteredSales: AdminSale[] = [];
 
   pagedSales: AdminSale[] = [];
 
+
+
+  // dropdown lists
   stores: SalesStore[] = [];
 
   titles: SalesTitle[] = [];
 
   availablePublishers: string[] = [];
 
+
+
+  // filter vars
   searchTerm = '';
 
   selectedStore = 'all';
@@ -69,6 +85,9 @@ export class ManageSales implements OnInit {
 
   showFilters = false;
 
+
+
+  // page messages and loading vars
   errorMessage = '';
 
   successMessage = '';
@@ -77,6 +96,9 @@ export class ManageSales implements OnInit {
 
   isSaving = false;
 
+
+
+  // form vars
   showSaleForm = false;
 
   formMode: SalesFormMode = 'createOrder';
@@ -85,11 +107,21 @@ export class ManageSales implements OnInit {
 
   isAddingToExistingOrder = false;
 
+
+
+  // this stores order when user clicks Add Items
+  // so html can show this is not a brand new order
+  selectedOrderForAddingItems: SalesOrder | null = null;
+
+
+
   editingStoreId: string | null = null;
 
   editingOrderNumber: string | null = null;
 
   editingTitleId: string | null = null;
+
+
 
   formStoreId = '';
 
@@ -105,10 +137,16 @@ export class ManageSales implements OnInit {
 
   formItems: SalesOrderFormLine[] = [];
 
+
+
+  // order details panel
   selectedOrderDetails: SalesOrderDetails | null = null;
 
   showOrderDetailsPanel = false;
 
+
+
+  // summary / email panel
   selectedOrderForSummary: SalesOrderDetails | null = null;
 
   selectedSaleForSummary: AdminSale | null = null;
@@ -119,6 +157,9 @@ export class ManageSales implements OnInit {
 
   emailTo = '';
 
+
+
+  // dashboard numbers
   totalSalesRecords = 0;
 
   totalQuantitySold = 0;
@@ -127,6 +168,9 @@ export class ManageSales implements OnInit {
 
   topSellingTitle = 'N/A';
 
+
+
+  // pagination vars
   currentPage = 1;
 
   pageSize = 10;
@@ -135,10 +179,26 @@ export class ManageSales implements OnInit {
 
   totalPages = 1;
 
+
+
+  // custom delete popup
+  // sales has 2 delete modes, delete one item or whole order
+  showConfirmModal = false;
+
+  confirmDeleteType: SalesDeleteTarget | null = null;
+
+  selectedSaleForDelete: AdminSale | null = null;
+
+  selectedOrderForDelete: SalesOrder | null = null;
+
+
+
   constructor(
     private adminSaleService: AdminSaleService,
     private cdr: ChangeDetectorRef
   ) {}
+
+
 
   ngOnInit(): void {
     this.loadOrders();
@@ -146,6 +206,24 @@ export class ManageSales implements OnInit {
     this.loadStores();
     this.loadTitles();
   }
+
+
+
+  // helper to move user to the correct section after clicking buttons
+  private scrollToSelector(selector: string): void {
+    setTimeout(() => {
+      const element = document.querySelector(selector);
+
+      if (element) {
+        element.scrollIntoView({
+          behavior: 'smooth',
+          block: 'start'
+        });
+      }
+    }, 150);
+  }
+
+
 
   loadOrders(clearMessages: boolean = true): void {
     this.isLoading = true;
@@ -180,6 +258,8 @@ export class ManageSales implements OnInit {
     });
   }
 
+
+
   loadSales(clearMessages: boolean = true): void {
     if (clearMessages) {
       this.errorMessage = '';
@@ -212,6 +292,8 @@ export class ManageSales implements OnInit {
     });
   }
 
+
+
   loadStores(): void {
     this.adminSaleService.getStores().subscribe({
       next: (data) => {
@@ -226,6 +308,8 @@ export class ManageSales implements OnInit {
       }
     });
   }
+
+
 
   loadTitles(): void {
     this.adminSaleService.getTitles().subscribe({
@@ -243,10 +327,14 @@ export class ManageSales implements OnInit {
     });
   }
 
+
+
   private refreshSalesData(clearMessages: boolean = false): void {
     this.loadOrders(clearMessages);
     this.loadSales(false);
   }
+
+
 
   private setPublisherList(): void {
     const publisherNamesFromSales = this.sales
@@ -265,6 +353,8 @@ export class ManageSales implements OnInit {
     ].sort();
   }
 
+
+
   private setDashboardNumbers(): void {
     this.totalSalesRecords = this.orders.length;
 
@@ -278,6 +368,8 @@ export class ManageSales implements OnInit {
 
     this.topSellingTitle = this.findTopSellingTitle();
   }
+
+
 
   private findTopSellingTitle(): string {
     if (this.sales.length === 0) {
@@ -306,15 +398,21 @@ export class ManageSales implements OnInit {
     return topTitle;
   }
 
+
+
   toggleFilters(): void {
     this.showFilters = !this.showFilters;
     this.cdr.detectChanges();
   }
 
+
+
   clearSuccessMessage(): void {
     this.successMessage = '';
     this.cdr.detectChanges();
   }
+
+
 
   applyFiltersAndSort(): void {
     const term = this.searchTerm.toLowerCase().trim();
@@ -378,6 +476,8 @@ export class ManageSales implements OnInit {
     this.cdr.detectChanges();
   }
 
+
+
   private getMatchingOrderKeysForLineFilters(): Set<string> {
     const keys = new Set<string>();
 
@@ -398,6 +498,8 @@ export class ManageSales implements OnInit {
     return keys;
   }
 
+
+
   clearFilters(): void {
     this.clearSuccessMessage();
 
@@ -412,6 +514,8 @@ export class ManageSales implements OnInit {
 
     this.applyFiltersAndSort();
   }
+
+
 
   private sortOrders(a: SalesOrder, b: SalesOrder): number {
     switch (this.selectedSort) {
@@ -456,9 +560,13 @@ export class ManageSales implements OnInit {
     }
   }
 
+
+
   private compareText(a: string, b: string): number {
     return a.localeCompare(b);
   }
+
+
 
   updatePagedSales(): void {
     this.totalPages = Math.ceil(this.filteredOrders.length / this.pageSize);
@@ -477,6 +585,8 @@ export class ManageSales implements OnInit {
     this.pagedOrders = this.filteredOrders.slice(startIndex, endIndex);
   }
 
+
+
   changePage(page: number): void {
     if (page < 1 || page > this.totalPages) {
       return;
@@ -484,14 +594,20 @@ export class ManageSales implements OnInit {
 
     this.currentPage = page;
     this.updatePagedSales();
+
     this.cdr.detectChanges();
   }
+
+
 
   onPageSizeChange(): void {
     this.currentPage = 1;
     this.updatePagedSales();
+
     this.cdr.detectChanges();
   }
+
+
 
   getPageNumbers(): number[] {
     const pages: number[] = [];
@@ -503,6 +619,8 @@ export class ManageSales implements OnInit {
     return pages;
   }
 
+
+
   getStartRecordNumber(): number {
     if (this.filteredOrders.length === 0) {
       return 0;
@@ -511,12 +629,17 @@ export class ManageSales implements OnInit {
     return (this.currentPage - 1) * this.pageSize + 1;
   }
 
+
+
   getEndRecordNumber(): number {
     const end = this.currentPage * this.pageSize;
 
     return Math.min(end, this.filteredOrders.length);
   }
 
+
+
+  // open form for brand new sales order
   openCreateForm(): void {
     this.errorMessage = '';
     this.successMessage = '';
@@ -525,6 +648,7 @@ export class ManageSales implements OnInit {
     this.formMode = 'createOrder';
     this.isEditMode = false;
     this.isAddingToExistingOrder = false;
+    this.selectedOrderForAddingItems = null;
 
     this.editingStoreId = null;
     this.editingOrderNumber = null;
@@ -545,8 +669,14 @@ export class ManageSales implements OnInit {
     ];
 
     this.cdr.detectChanges();
+
+    this.scrollToSelector('.sale-form-anchor');
   }
 
+
+
+  // this is the big fix
+  // now Add Items means adding new title items to the SAME order
   openAddLineToOrder(order: SalesOrder): void {
     this.errorMessage = '';
     this.successMessage = '';
@@ -555,6 +685,7 @@ export class ManageSales implements OnInit {
     this.formMode = 'createOrder';
     this.isEditMode = false;
     this.isAddingToExistingOrder = true;
+    this.selectedOrderForAddingItems = order;
 
     this.editingStoreId = null;
     this.editingOrderNumber = null;
@@ -574,9 +705,17 @@ export class ManageSales implements OnInit {
       }
     ];
 
+    // show current order items too, but dont jump there, because user clicked Add Items
+    this.loadOrderDetails(order.stor_id, order.ord_num, 'details', false);
+
     this.cdr.detectChanges();
+
+    this.scrollToSelector('.sale-form-anchor');
   }
 
+
+
+  // edit one line item from the order
   openEditForm(sale: AdminSale): void {
     this.errorMessage = '';
     this.successMessage = '';
@@ -585,6 +724,7 @@ export class ManageSales implements OnInit {
     this.formMode = 'editLine';
     this.isEditMode = true;
     this.isAddingToExistingOrder = false;
+    this.selectedOrderForAddingItems = null;
 
     this.editingStoreId = sale.stor_id;
     this.editingOrderNumber = sale.ord_num;
@@ -600,13 +740,18 @@ export class ManageSales implements OnInit {
     this.formItems = [];
 
     this.cdr.detectChanges();
+
+    this.scrollToSelector('.sale-form-anchor');
   }
+
+
 
   cancelForm(): void {
     this.showSaleForm = false;
     this.formMode = 'createOrder';
     this.isEditMode = false;
     this.isAddingToExistingOrder = false;
+    this.selectedOrderForAddingItems = null;
 
     this.editingStoreId = null;
     this.editingOrderNumber = null;
@@ -625,6 +770,8 @@ export class ManageSales implements OnInit {
     this.cdr.detectChanges();
   }
 
+
+
   addFormLine(): void {
     this.formItems.push({
       title_id: '',
@@ -633,6 +780,8 @@ export class ManageSales implements OnInit {
 
     this.cdr.detectChanges();
   }
+
+
 
   removeFormLine(index: number): void {
     if (this.formItems.length <= 1) {
@@ -643,8 +792,11 @@ export class ManageSales implements OnInit {
 
     this.formItems.splice(index, 1);
     this.errorMessage = '';
+
     this.cdr.detectChanges();
   }
+
+
 
   saveSale(): void {
     this.errorMessage = '';
@@ -696,6 +848,8 @@ export class ManageSales implements OnInit {
     this.createOrder(createData);
   }
 
+
+
   private validateSaleForm(): string {
     if (!this.formStoreId) {
       return 'Store is required.';
@@ -745,6 +899,15 @@ export class ManageSales implements OnInit {
 
     const usedTitleIds = new Set<string>();
 
+    const existingTitleIds = new Set(
+      this.sales
+        .filter(sale =>
+          sale.stor_id === this.formStoreId &&
+          sale.ord_num === this.formOrderNumber
+        )
+        .map(sale => sale.title_id)
+    );
+
     for (const item of this.formItems) {
       if (!item.title_id) {
         return 'Each item must have a selected title.';
@@ -752,6 +915,10 @@ export class ManageSales implements OnInit {
 
       if (usedTitleIds.has(item.title_id)) {
         return 'The same title cannot be added twice in the same order. Increase the quantity instead.';
+      }
+
+      if (this.isAddingToExistingOrder && existingTitleIds.has(item.title_id)) {
+        return 'This title is already inside this order. Edit the existing item quantity instead.';
       }
 
       usedTitleIds.add(item.title_id);
@@ -770,6 +937,9 @@ export class ManageSales implements OnInit {
     return '';
   }
 
+
+
+  // old single sale create method, keeping it in case old service still uses it somewhere
   createSale(saleData: SaleCreateRequest): void {
     this.isSaving = true;
 
@@ -800,7 +970,14 @@ export class ManageSales implements OnInit {
     });
   }
 
+
+
+  // create new order OR add items to existing order
   createOrder(orderData: SalesOrderCreateRequest): void {
+    const wasAddingToExistingOrder = this.isAddingToExistingOrder;
+    const orderStoreId = this.formStoreId;
+    const orderNumber = this.formOrderNumber;
+
     this.isSaving = true;
 
     this.adminSaleService.createOrder(orderData).subscribe({
@@ -812,6 +989,11 @@ export class ManageSales implements OnInit {
         this.successMessage = response.message;
 
         this.refreshSalesData(false);
+
+        // if user added item to existing order, open details after save
+        if (wasAddingToExistingOrder) {
+          this.loadOrderDetails(orderStoreId, orderNumber, 'details', true);
+        }
 
         this.cdr.detectChanges();
       },
@@ -829,6 +1011,8 @@ export class ManageSales implements OnInit {
       }
     });
   }
+
+
 
   updateSale(
     storeId: string,
@@ -849,11 +1033,11 @@ export class ManageSales implements OnInit {
         this.refreshSalesData(false);
 
         if (this.showOrderDetailsPanel && this.selectedOrderDetails) {
-          this.loadOrderDetails(this.selectedOrderDetails.stor_id, this.selectedOrderDetails.ord_num, 'details');
+          this.loadOrderDetails(this.selectedOrderDetails.stor_id, this.selectedOrderDetails.ord_num, 'details', false);
         }
 
         if (this.showSummaryPanel && this.selectedOrderForSummary) {
-          this.loadOrderDetails(this.selectedOrderForSummary.stor_id, this.selectedOrderForSummary.ord_num, 'summary');
+          this.loadOrderDetails(this.selectedOrderForSummary.stor_id, this.selectedOrderForSummary.ord_num, 'summary', false);
         }
 
         this.cdr.detectChanges();
@@ -873,24 +1057,145 @@ export class ManageSales implements OnInit {
     });
   }
 
+
+
+  // custom popup for one item
   deleteSale(sale: AdminSale): void {
     this.errorMessage = '';
     this.successMessage = '';
 
-    const confirmed = confirm(
-      `Are you sure you want to delete this item?\n\nOrder: ${sale.ord_num}\nStore: ${sale.stor_name || sale.stor_id}\nTitle: ${sale.title || sale.title_id}`
-    );
+    this.confirmDeleteType = 'line';
+    this.selectedSaleForDelete = sale;
+    this.selectedOrderForDelete = null;
+    this.showConfirmModal = true;
 
-    if (!confirmed) {
+    this.cdr.detectChanges();
+  }
+
+
+
+  // custom popup for full order
+  deleteOrder(order: SalesOrder): void {
+    this.errorMessage = '';
+    this.successMessage = '';
+
+    this.confirmDeleteType = 'order';
+    this.selectedOrderForDelete = order;
+    this.selectedSaleForDelete = null;
+    this.showConfirmModal = true;
+
+    this.cdr.detectChanges();
+  }
+
+
+
+  closeConfirmModal(): void {
+    this.showConfirmModal = false;
+    this.confirmDeleteType = null;
+    this.selectedSaleForDelete = null;
+    this.selectedOrderForDelete = null;
+
+    this.cdr.detectChanges();
+  }
+
+
+
+  getDeleteConfirmTitle(): string {
+    if (this.confirmDeleteType === 'order') {
+      return 'Delete Full Sales Order?';
+    }
+
+    return 'Delete Sales Item?';
+  }
+
+
+
+  getDeleteConfirmName(): string {
+    if (this.confirmDeleteType === 'order' && this.selectedOrderForDelete) {
+      return `Order ${this.selectedOrderForDelete.ord_num}`;
+    }
+
+    if (this.confirmDeleteType === 'line' && this.selectedSaleForDelete) {
+      return this.selectedSaleForDelete.title || this.selectedSaleForDelete.title_id;
+    }
+
+    return '';
+  }
+
+
+
+  getDeleteConfirmId(): string {
+    if (this.confirmDeleteType === 'order' && this.selectedOrderForDelete) {
+      return `Store: ${this.selectedOrderForDelete.stor_name || this.selectedOrderForDelete.stor_id}`;
+    }
+
+    if (this.confirmDeleteType === 'line' && this.selectedSaleForDelete) {
+      return `Order: ${this.selectedSaleForDelete.ord_num}`;
+    }
+
+    return '';
+  }
+
+
+
+  getDeleteConfirmMessage(): string {
+    if (this.confirmDeleteType === 'order') {
+      return 'This will permanently delete the full sales order and every title item inside it. This action cannot be undone.';
+    }
+
+    return 'This will permanently delete this one title item from the sales order.';
+  }
+
+
+
+  getDeleteConfirmWarning(): string {
+    if (this.confirmDeleteType === 'order' && this.selectedOrderForDelete) {
+      return `This order has ${this.selectedOrderForDelete.line_count} item(s). All of them will be deleted.`;
+    }
+
+    if (this.confirmDeleteType === 'line' && this.selectedSaleForDelete) {
+      return 'Only this title item will be removed. The order can still stay if other items exist.';
+    }
+
+    return '';
+  }
+
+
+
+  confirmDeleteSalesAction(): void {
+    if (this.confirmDeleteType === 'order') {
+      this.confirmDeleteOrder();
       return;
     }
 
+    if (this.confirmDeleteType === 'line') {
+      this.confirmDeleteSaleLine();
+      return;
+    }
+  }
+
+
+
+  private confirmDeleteSaleLine(): void {
+    if (!this.selectedSaleForDelete) {
+      return;
+    }
+
+    const saleToDelete = this.selectedSaleForDelete;
+
+    this.showConfirmModal = false;
+    this.confirmDeleteType = null;
+    this.selectedSaleForDelete = null;
+    this.selectedOrderForDelete = null;
+
     this.isSaving = true;
+    this.errorMessage = '';
+    this.successMessage = '';
 
     this.adminSaleService.deleteSale(
-      sale.stor_id,
-      sale.ord_num,
-      sale.title_id
+      saleToDelete.stor_id,
+      saleToDelete.ord_num,
+      saleToDelete.title_id
     ).subscribe({
       next: (response) => {
         this.isSaving = false;
@@ -900,11 +1205,11 @@ export class ManageSales implements OnInit {
         this.refreshSalesData(false);
 
         if (this.selectedOrderDetails) {
-          this.loadOrderDetails(this.selectedOrderDetails.stor_id, this.selectedOrderDetails.ord_num, 'details');
+          this.loadOrderDetails(this.selectedOrderDetails.stor_id, this.selectedOrderDetails.ord_num, 'details', false);
         }
 
         if (this.selectedOrderForSummary) {
-          this.loadOrderDetails(this.selectedOrderForSummary.stor_id, this.selectedOrderForSummary.ord_num, 'summary');
+          this.loadOrderDetails(this.selectedOrderForSummary.stor_id, this.selectedOrderForSummary.ord_num, 'summary', false);
         }
 
         this.cdr.detectChanges();
@@ -924,21 +1229,25 @@ export class ManageSales implements OnInit {
     });
   }
 
-  deleteOrder(order: SalesOrder): void {
-    this.errorMessage = '';
-    this.successMessage = '';
 
-    const confirmed = confirm(
-      `Are you sure you want to delete the full order?\n\nOrder: ${order.ord_num}\nStore: ${order.stor_name || order.stor_id}\nItems: ${order.line_count}\n\nThis will delete every title item in this order.`
-    );
 
-    if (!confirmed) {
+  private confirmDeleteOrder(): void {
+    if (!this.selectedOrderForDelete) {
       return;
     }
 
-    this.isSaving = true;
+    const orderToDelete = this.selectedOrderForDelete;
 
-    this.adminSaleService.deleteOrder(order.stor_id, order.ord_num).subscribe({
+    this.showConfirmModal = false;
+    this.confirmDeleteType = null;
+    this.selectedSaleForDelete = null;
+    this.selectedOrderForDelete = null;
+
+    this.isSaving = true;
+    this.errorMessage = '';
+    this.successMessage = '';
+
+    this.adminSaleService.deleteOrder(orderToDelete.stor_id, orderToDelete.ord_num).subscribe({
       next: (response) => {
         this.isSaving = false;
 
@@ -946,16 +1255,16 @@ export class ManageSales implements OnInit {
 
         if (
           this.selectedOrderDetails &&
-          this.selectedOrderDetails.stor_id === order.stor_id &&
-          this.selectedOrderDetails.ord_num === order.ord_num
+          this.selectedOrderDetails.stor_id === orderToDelete.stor_id &&
+          this.selectedOrderDetails.ord_num === orderToDelete.ord_num
         ) {
           this.closeOrderDetailsPanel();
         }
 
         if (
           this.selectedOrderForSummary &&
-          this.selectedOrderForSummary.stor_id === order.stor_id &&
-          this.selectedOrderForSummary.ord_num === order.ord_num
+          this.selectedOrderForSummary.stor_id === orderToDelete.stor_id &&
+          this.selectedOrderForSummary.ord_num === orderToDelete.ord_num
         ) {
           this.closeSummaryPanel();
         }
@@ -979,23 +1288,32 @@ export class ManageSales implements OnInit {
     });
   }
 
+
+
+  // view items, then jump to items section
   openOrderDetails(order: SalesOrder): void {
     this.errorMessage = '';
     this.successMessage = '';
 
-    this.loadOrderDetails(order.stor_id, order.ord_num, 'details');
+    this.loadOrderDetails(order.stor_id, order.ord_num, 'details', true);
   }
+
+
 
   closeOrderDetailsPanel(): void {
     this.selectedOrderDetails = null;
     this.showOrderDetailsPanel = false;
+
     this.cdr.detectChanges();
   }
+
+
 
   private loadOrderDetails(
     storeId: string,
     orderNumber: string,
-    target: 'details' | 'summary'
+    target: 'details' | 'summary',
+    shouldScroll: boolean = true
   ): void {
     this.isLoading = true;
 
@@ -1006,6 +1324,10 @@ export class ManageSales implements OnInit {
         if (target === 'details') {
           this.selectedOrderDetails = data;
           this.showOrderDetailsPanel = true;
+
+          if (shouldScroll) {
+            this.scrollToSelector('.order-details-anchor');
+          }
         }
 
         if (target === 'summary') {
@@ -1014,6 +1336,10 @@ export class ManageSales implements OnInit {
           this.showSummaryPanel = true;
           this.showEmailPanel = false;
           this.emailTo = '';
+
+          if (shouldScroll) {
+            this.scrollToSelector('.summary-panel-anchor');
+          }
         }
 
         this.cdr.detectChanges();
@@ -1043,12 +1369,16 @@ export class ManageSales implements OnInit {
     });
   }
 
+
+
   openSummaryPanel(orderOrSale: SalesOrder | AdminSale): void {
     this.errorMessage = '';
     this.successMessage = '';
 
-    this.loadOrderDetails(orderOrSale.stor_id, orderOrSale.ord_num, 'summary');
+    this.loadOrderDetails(orderOrSale.stor_id, orderOrSale.ord_num, 'summary', true);
   }
+
+
 
   closeSummaryPanel(): void {
     this.selectedOrderForSummary = null;
@@ -1056,8 +1386,11 @@ export class ManageSales implements OnInit {
     this.showSummaryPanel = false;
     this.showEmailPanel = false;
     this.emailTo = '';
+
     this.cdr.detectChanges();
   }
+
+
 
   openEmailPanel(): void {
     if (!this.selectedOrderForSummary) {
@@ -1067,14 +1400,20 @@ export class ManageSales implements OnInit {
     this.errorMessage = '';
     this.successMessage = '';
     this.showEmailPanel = true;
+
     this.cdr.detectChanges();
   }
+
+
 
   cancelEmailPanel(): void {
     this.showEmailPanel = false;
     this.emailTo = '';
+
     this.cdr.detectChanges();
   }
+
+
 
   sendSaleSummaryEmail(): void {
     if (!this.selectedOrderForSummary) {
@@ -1108,6 +1447,7 @@ export class ManageSales implements OnInit {
         this.successMessage = response.message;
         this.showEmailPanel = false;
         this.emailTo = '';
+
         this.cdr.detectChanges();
       },
       error: (err) => {
@@ -1124,6 +1464,8 @@ export class ManageSales implements OnInit {
       }
     });
   }
+
+
 
   printSaleSummary(): void {
     if (!this.selectedOrderForSummary) {
@@ -1348,6 +1690,8 @@ export class ManageSales implements OnInit {
     }, 500);
   }
 
+
+
   getSelectedTitlePrice(titleId: string = this.formTitleId): number {
     const selectedTitle = this.titles.find(title =>
       title.title_id === titleId
@@ -1355,6 +1699,8 @@ export class ManageSales implements OnInit {
 
     return Number(selectedTitle?.price ?? 0);
   }
+
+
 
   getSelectedTitleName(titleId: string): string {
     const selectedTitle = this.titles.find(title =>
@@ -1364,6 +1710,8 @@ export class ManageSales implements OnInit {
     return selectedTitle?.title || titleId || 'N/A';
   }
 
+
+
   getSelectedTitlePublisher(titleId: string): string {
     const selectedTitle = this.titles.find(title =>
       title.title_id === titleId
@@ -1372,12 +1720,16 @@ export class ManageSales implements OnInit {
     return selectedTitle?.pub_name || 'N/A';
   }
 
+
+
   getFormLineEstimatedRevenue(line: SalesOrderFormLine): number {
     const quantity = Number(line.qty ?? 0);
     const price = this.getSelectedTitlePrice(line.title_id);
 
     return quantity * price;
   }
+
+
 
   getFormEstimatedRevenue(): number {
     if (this.formMode === 'editLine') {
@@ -1392,6 +1744,70 @@ export class ManageSales implements OnInit {
     }, 0);
   }
 
+
+
+  getFormItemsQty(): number {
+    if (this.formMode === 'editLine') {
+      return Number(this.formQty ?? 0);
+    }
+
+    return this.formItems.reduce((sum, line) => {
+      return sum + Number(line.qty ?? 0);
+    }, 0);
+  }
+
+
+
+  getProjectedOrderQty(): number {
+    if (!this.selectedOrderForAddingItems) {
+      return this.getFormItemsQty();
+    }
+
+    return Number(this.selectedOrderForAddingItems.total_qty ?? 0) + this.getFormItemsQty();
+  }
+
+
+
+  getProjectedOrderRevenue(): number {
+    if (!this.selectedOrderForAddingItems) {
+      return this.getFormEstimatedRevenue();
+    }
+
+    return this.getOrderRevenue(this.selectedOrderForAddingItems) + this.getFormEstimatedRevenue();
+  }
+
+
+
+  getAddItemsOrderTitle(): string {
+    if (this.isEditMode) {
+      return 'Edit Sales Item';
+    }
+
+    if (this.selectedOrderForAddingItems) {
+      return `Add Items to Order ${this.selectedOrderForAddingItems.ord_num}`;
+    }
+
+    return 'Create Sales Order';
+  }
+
+
+
+  getAddItemsOrderSubText(): string {
+    if (this.isEditMode) {
+      return 'Update the quantity, date, and payment terms for this sales item.';
+    }
+
+    if (this.selectedOrderForAddingItems) {
+      const storeName = this.selectedOrderForAddingItems.stor_name || this.selectedOrderForAddingItems.stor_id;
+
+      return `Adding new title items to ${storeName}. Existing order amount will update after saving.`;
+    }
+
+    return 'Create a new sales order and add one or more title items.';
+  }
+
+
+
   getSaleRevenue(sale: AdminSale): number {
     if (sale.estimated_revenue !== null && sale.estimated_revenue !== undefined) {
       return Number(sale.estimated_revenue);
@@ -1400,9 +1816,13 @@ export class ManageSales implements OnInit {
     return Number(sale.qty ?? 0) * Number(sale.price ?? 0);
   }
 
+
+
   getOrderRevenue(order: SalesOrder): number {
     return Number(order.order_total ?? 0);
   }
+
+
 
   getOrderDetailsRevenue(order: SalesOrderDetails): number {
     if (order.order_total !== null && order.order_total !== undefined) {
@@ -1414,6 +1834,8 @@ export class ManageSales implements OnInit {
     }, 0);
   }
 
+
+
   getStoreLocation(sale: AdminSale): string {
     const city = sale.store_city ?? '';
     const state = sale.store_state ?? '';
@@ -1423,6 +1845,8 @@ export class ManageSales implements OnInit {
     return location || 'N/A';
   }
 
+
+
   getOrderLocation(order: SalesOrder | SalesOrderDetails): string {
     const city = order.store_city ?? '';
     const state = order.store_state ?? '';
@@ -1431,6 +1855,8 @@ export class ManageSales implements OnInit {
 
     return location || 'N/A';
   }
+
+
 
   private generateNextOrderNumber(): string {
     const existingOrderNumbers = [
@@ -1451,11 +1877,15 @@ export class ManageSales implements OnInit {
     return `ORD${nextNumber}`;
   }
 
+
+
   getTodayForInput(): string {
     const today = new Date();
 
     return today.toISOString().slice(0, 10);
   }
+
+
 
   formatDateForInput(value: string | Date | null | undefined): string {
     if (!value) {
@@ -1477,9 +1907,13 @@ export class ManageSales implements OnInit {
     return dateValue.toISOString().slice(0, 10);
   }
 
+
+
   formatDateForDisplay(value: string | Date | null | undefined): string {
     return this.formatCleanDate(value);
   }
+
+
 
   formatCleanDate(value: string | Date | null | undefined): string {
     if (!value) {
@@ -1516,13 +1950,19 @@ export class ManageSales implements OnInit {
     });
   }
 
+
+
   formatMoney(value: number | null | undefined): string {
     return Number(value ?? 0).toFixed(2);
   }
 
+
+
   private getOrderKey(storeId: string, orderNumber: string): string {
     return `${storeId}__${orderNumber}`;
   }
+
+
 
   private escapeHtml(value: string | null | undefined): string {
     return String(value ?? '')

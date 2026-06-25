@@ -1,10 +1,11 @@
 import { Component, ChangeDetectorRef, OnInit } from '@angular/core';
 import { Router } from '@angular/router';
 
-import { DatePipe, TitleCasePipe } from '@angular/common';
+import { CommonModule, DatePipe, TitleCasePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
+import { MatIconModule } from '@angular/material/icon';
 
 import { AdminEmployeeService } from '../services/admin-employee';
 import { AdminEmployee, EmployeeUpdateRequest, Job, Publisher } from '../models/admin-employee';
@@ -13,30 +14,37 @@ import { ManageEmployeeEditDialog } from '../manage-employee-edit-dialog/manage-
 @Component({
   selector: 'app-manage-employees',
   imports: [
+    CommonModule,
     FormsModule,
     DatePipe,
     TitleCasePipe,
-    MatDialogModule
+    MatDialogModule,
+    MatIconModule
   ],
   templateUrl: './manage-employees.html',
   styleUrl: './manage-employees.css'
 })
 export class ManageEmployees implements OnInit {
 
-  // store all employees/users from database
+  // this stores all employees/users coming from the database
   employees: AdminEmployee[] = [];
 
-  // filtered employees after search/filter/sort
+  // this is after search/filter/sort is applied
   filteredEmployees: AdminEmployee[] = [];
 
-  // employees shown on current page
+  // this is only the records showing on the current page
   pagedEmployees: AdminEmployee[] = [];
 
-  // jobs and publishers used for edit dialog dropdowns
+
+
+  // jobs and publishers are used inside edit popup dropdowns
   jobs: Job[] = [];
 
   publishers: Publisher[] = [];
 
+
+
+  // filter and sort variables
   searchTerm = '';
 
   selectedAccountStatus = 'all';
@@ -49,6 +57,9 @@ export class ManageEmployees implements OnInit {
 
   showFilters = false;
 
+
+
+  // these are used to show messages on the page
   errorMessage = '';
 
   successMessage = '';
@@ -57,7 +68,9 @@ export class ManageEmployees implements OnInit {
 
   isSaving = false;
 
-  // dashboard numbers
+
+
+  // dashboard cards numbers
   totalEmployees = 0;
 
   appUsers = 0;
@@ -70,7 +83,9 @@ export class ManageEmployees implements OnInit {
 
   employeesWithoutLogin = 0;
 
-  // pagination variables
+
+
+  // pagination stuff
   currentPage = 1;
 
   pageSize = 10;
@@ -79,6 +94,17 @@ export class ManageEmployees implements OnInit {
 
   totalPages = 1;
 
+
+
+  // this is for our custom fancy delete popup
+  // we use this instead of ugly browser confirm
+  showConfirmModal = false;
+
+  // this remembers what employee user clicked delete on
+  selectedEmployeeForDelete: AdminEmployee | null = null;
+
+
+
   constructor(
     private adminEmployeeService: AdminEmployeeService,
     private router: Router,
@@ -86,11 +112,16 @@ export class ManageEmployees implements OnInit {
     private cdr: ChangeDetectorRef
   ) {}
 
+
+
   ngOnInit(): void {
     this.loadEmployees();
     this.loadDropdownData();
   }
 
+
+
+  // load employees/users from backend api
   loadEmployees(): void {
     this.isLoading = true;
     this.errorMessage = '';
@@ -102,6 +133,7 @@ export class ManageEmployees implements OnInit {
 
         this.setDashboardNumbers();
 
+        // this builds position dropdown list without duplicates
         this.availablePositions = [
           ...new Set(
             data
@@ -120,11 +152,15 @@ export class ManageEmployees implements OnInit {
 
         this.errorMessage = 'Could not load employees. Make sure the backend server is running.';
         this.isLoading = false;
+
         this.cdr.detectChanges();
       }
     });
   }
 
+
+
+  // loading jobs and publishers for edit dialog dropdowns
   loadDropdownData(): void {
     this.adminEmployeeService.getJobs().subscribe({
       next: (data) => {
@@ -133,6 +169,7 @@ export class ManageEmployees implements OnInit {
       },
       error: (err) => {
         console.error('Error loading jobs:', err);
+
         this.errorMessage = 'Could not load jobs for employee editing.';
         this.cdr.detectChanges();
       }
@@ -145,17 +182,22 @@ export class ManageEmployees implements OnInit {
       },
       error: (err) => {
         console.error('Error loading publishers:', err);
+
         this.errorMessage = 'Could not load publishers for employee editing.';
         this.cdr.detectChanges();
       }
     });
   }
 
-  // this sets dashboard card numbers on top of page
+
+
+  // this sets the small dashboard card numbers
   private setDashboardNumbers(): void {
     this.totalEmployees = this.employees.length;
 
-    this.appUsers = this.employees.filter(employee => employee.user_id !== null).length;
+    this.appUsers = this.employees.filter(employee =>
+      employee.user_id !== null
+    ).length;
 
     this.pendingInvites = this.employees.filter(employee =>
       employee.user_id !== null &&
@@ -175,16 +217,25 @@ export class ManageEmployees implements OnInit {
     ).length;
   }
 
+
+
+  // open/close filter box
   toggleFilters(): void {
     this.showFilters = !this.showFilters;
     this.cdr.detectChanges();
   }
 
+
+
+  // clears green success message when user does new action
   clearSuccessMessage(): void {
     this.successMessage = '';
     this.cdr.detectChanges();
   }
 
+
+
+  // main search/filter/sort method
   applyFiltersAndSort(): void {
     const term = this.searchTerm.toLowerCase().trim();
 
@@ -246,6 +297,8 @@ export class ManageEmployees implements OnInit {
     this.cdr.detectChanges();
   }
 
+
+
   clearFilters(): void {
     this.clearSuccessMessage();
 
@@ -258,6 +311,9 @@ export class ManageEmployees implements OnInit {
     this.applyFiltersAndSort();
   }
 
+
+
+  // sorting logic for table
   private sortEmployees(a: AdminEmployee, b: AdminEmployee): number {
     switch (this.selectedSort) {
       case 'lastNameAsc':
@@ -295,10 +351,15 @@ export class ManageEmployees implements OnInit {
     }
   }
 
+
+
   private compareText(a: string, b: string): number {
     return a.localeCompare(b);
   }
 
+
+
+  // this updates what records show on page 1,2,3 etc
   updatePagedEmployees(): void {
     this.totalPages = Math.ceil(this.filteredEmployees.length / this.pageSize);
 
@@ -316,6 +377,8 @@ export class ManageEmployees implements OnInit {
     this.pagedEmployees = this.filteredEmployees.slice(startIndex, endIndex);
   }
 
+
+
   changePage(page: number): void {
     if (page < 1 || page > this.totalPages) {
       return;
@@ -323,14 +386,20 @@ export class ManageEmployees implements OnInit {
 
     this.currentPage = page;
     this.updatePagedEmployees();
+
     this.cdr.detectChanges();
   }
+
+
 
   onPageSizeChange(): void {
     this.currentPage = 1;
     this.updatePagedEmployees();
+
     this.cdr.detectChanges();
   }
+
+
 
   getPageNumbers(): number[] {
     const pages: number[] = [];
@@ -342,6 +411,8 @@ export class ManageEmployees implements OnInit {
     return pages;
   }
 
+
+
   getStartRecordNumber(): number {
     if (this.filteredEmployees.length === 0) {
       return 0;
@@ -350,12 +421,17 @@ export class ManageEmployees implements OnInit {
     return (this.currentPage - 1) * this.pageSize + 1;
   }
 
+
+
   getEndRecordNumber(): number {
     const end = this.currentPage * this.pageSize;
 
     return Math.min(end, this.filteredEmployees.length);
   }
 
+
+
+  // formats full name nice in table and popup
   getFullName(employee: AdminEmployee): string {
     if (employee.minit) {
       return `${employee.fname} ${employee.minit}. ${employee.lname}`;
@@ -364,6 +440,9 @@ export class ManageEmployees implements OnInit {
     return `${employee.fname} ${employee.lname}`;
   }
 
+
+
+  // checks what account status text should show
   getAccountStatus(employee: AdminEmployee): string {
     if (employee.user_id === null) {
       return 'No Login';
@@ -380,6 +459,9 @@ export class ManageEmployees implements OnInit {
     return 'Active';
   }
 
+
+
+  // css class for account badge colors
   getAccountStatusClass(employee: AdminEmployee): string {
     const status = this.getAccountStatus(employee);
 
@@ -398,14 +480,22 @@ export class ManageEmployees implements OnInit {
     return 'status-no-login';
   }
 
+
+
   getYesNo(value: boolean | number | null): string {
     return this.toBoolean(value) ? 'Yes' : 'No';
   }
 
+
+
+  // sql bit comes as true/false or 1/0 sometimes so this handles both
   private toBoolean(value: boolean | number | null): boolean {
     return value === true || value === 1;
   }
 
+
+
+  // opens material edit popup
   openEditDialog(employee: AdminEmployee): void {
     this.errorMessage = '';
     this.successMessage = '';
@@ -437,6 +527,9 @@ export class ManageEmployees implements OnInit {
     });
   }
 
+
+
+  // sends update request after edit popup closes
   updateEmployee(empId: string, updateData: EmployeeUpdateRequest): void {
     this.isSaving = true;
     this.errorMessage = '';
@@ -466,24 +559,94 @@ export class ManageEmployees implements OnInit {
     });
   }
 
+
+
+  // this opens our custom fancy delete popup
+  // no more ugly browser confirm here
   deleteEmployee(employee: AdminEmployee): void {
     this.errorMessage = '';
     this.successMessage = '';
 
-    const confirmed = confirm(
-      `Are you sure you want to delete ${this.getFullName(employee)} (${employee.emp_id})?\n\nThis will delete the app user account and employee record.`
-    );
+    this.selectedEmployeeForDelete = employee;
+    this.showConfirmModal = true;
 
-    if (!confirmed) {
+    this.cdr.detectChanges();
+  }
+
+
+
+  // closes custom popup
+  closeConfirmModal(): void {
+    this.showConfirmModal = false;
+    this.selectedEmployeeForDelete = null;
+
+    this.cdr.detectChanges();
+  }
+
+
+
+  // popup title
+  getDeleteConfirmTitle(): string {
+    return 'Delete Employee User?';
+  }
+
+
+
+  // popup message
+  getDeleteConfirmMessage(): string {
+    if (!this.selectedEmployeeForDelete) {
+      return '';
+    }
+
+    return 'This will permanently delete the app user account and employee record. This action cannot be undone.';
+  }
+
+
+
+  getSelectedEmployeeName(): string {
+    if (!this.selectedEmployeeForDelete) {
+      return '';
+    }
+
+    return this.getFullName(this.selectedEmployeeForDelete);
+  }
+
+
+
+  getSelectedEmployeeId(): string {
+    if (!this.selectedEmployeeForDelete) {
+      return '';
+    }
+
+    return this.selectedEmployeeForDelete.emp_id;
+  }
+
+
+
+  // this runs only after user clicks delete inside our nice popup
+  confirmDeleteEmployee(): void {
+    if (!this.selectedEmployeeForDelete) {
       return;
     }
 
-    this.isSaving = true;
+    const employeeToDelete = this.selectedEmployeeForDelete;
+    const employeeName = this.getFullName(employeeToDelete);
+    const employeeId = employeeToDelete.emp_id;
 
-    this.adminEmployeeService.deleteEmployee(employee.emp_id).subscribe({
+    this.showConfirmModal = false;
+    this.selectedEmployeeForDelete = null;
+
+    this.isSaving = true;
+    this.errorMessage = '';
+    this.successMessage = '';
+
+    this.adminEmployeeService.deleteEmployee(employeeId).subscribe({
       next: (response) => {
         this.isSaving = false;
-        this.successMessage = response.message;
+
+        this.successMessage =
+          response.message ||
+          `Employee ${employeeName} (${employeeId}) deleted successfully.`;
 
         this.loadEmployees();
 
@@ -504,6 +667,9 @@ export class ManageEmployees implements OnInit {
     });
   }
 
+
+
+  // goes to create employee page
   goToCreateEmployee(): void {
     this.router.navigate(['/manage-employees/new']);
   }

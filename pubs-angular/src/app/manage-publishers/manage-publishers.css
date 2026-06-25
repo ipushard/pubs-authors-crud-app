@@ -615,3 +615,148 @@
     align-items: stretch;
   }
 }
+
+
+
+
+/* fancy delete confirmation modal */
+/* this is our custom popup so we dont use ugly browser confirm */
+.confirm-overlay {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.62);
+
+  display: flex;
+  justify-content: center;
+  align-items: center;
+
+  z-index: 9999;
+  padding: 20px;
+  animation: modalFadeIn 0.18s ease-in-out;
+}
+
+.confirm-modal {
+  width: 100%;
+  max-width: 520px;
+  background-color: #ffffff;
+  border-radius: 8px;
+  border-top: 8px solid #d00000;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.35);
+  padding: 28px;
+  text-align: center;
+  animation: modalSlideIn 0.2s ease-in-out;
+}
+
+.danger-modal {
+  border-top-color: #d00000;
+}
+
+.confirm-icon {
+  width: 72px;
+  height: 72px;
+  margin: 0 auto 18px auto;
+  border-radius: 50%;
+
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.danger-icon {
+  background-color: #fce8e6;
+  color: #d00000;
+  border: 2px solid #d00000;
+}
+
+.confirm-icon mat-icon {
+  font-size: 38px;
+  width: 38px;
+  height: 38px;
+}
+
+.confirm-modal h2 {
+  margin: 0 0 12px 0;
+  font-size: 26px;
+  color: #1a1a1a;
+}
+
+.confirm-name {
+  margin: 8px 0 4px 0;
+  font-size: 18px;
+  color: #1a1a1a;
+}
+
+.confirm-id {
+  margin: 0 0 18px 0;
+  font-size: 14px;
+  color: #555555;
+}
+
+.confirm-message {
+  margin: 0 auto 16px auto;
+  max-width: 420px;
+  font-size: 15px;
+  line-height: 1.5;
+  color: #333333;
+}
+
+.confirm-warning {
+  background-color: #fff4e5;
+  border: 1px solid #fbbc04;
+  border-left: 6px solid #fbbc04;
+  color: #5f3b00;
+  padding: 12px 14px;
+  text-align: left;
+  font-size: 14px;
+  font-weight: 700;
+  margin: 18px 0;
+  border-radius: 4px;
+}
+
+.confirm-actions {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 22px;
+}
+
+.confirm-actions .btn {
+  min-width: 140px;
+  padding: 10px 16px;
+}
+
+@keyframes modalFadeIn {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes modalSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-12px) scale(0.97);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@media (max-width: 600px) {
+  .confirm-modal {
+    padding: 22px;
+  }
+
+  .confirm-actions {
+    flex-direction: column;
+  }
+
+  .confirm-actions .btn {
+    width: 100%;
+  }
+}

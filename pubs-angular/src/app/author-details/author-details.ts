@@ -137,13 +137,20 @@ export class AuthorDetails implements OnInit {
 
     this.authorService.updateAuthor(this.author.au_id, this.author).subscribe({
       next: () => {
-        this.successMessage = 'Author updated successfully.';
-        this.isEditing = false;
+              const updatedAuthorName = `${this.author?.au_fname} ${this.author?.au_lname}`;
+              const updatedAuthorId = this.author?.au_id || '';
 
-        // after saving, go back to the table page.
-        // the authors component will reload the table from the database.
-        this.router.navigate(['/authors']);
-      },
+              this.isEditing = false;
+
+              // after saving, go back to the table page
+              // and send updated author info so table page can show success message
+              this.router.navigate(['/authors'], {
+                queryParams: {
+                  updatedAuthorName: updatedAuthorName,
+                  updatedAuthorId: updatedAuthorId
+                }
+              });
+            },
       error: (err) => {
         console.error('Error updating author:', err);
 

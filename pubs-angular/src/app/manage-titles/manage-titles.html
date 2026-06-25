@@ -1,5 +1,6 @@
 <div class="manage-page">
 
+  <!-- top black header -->
   <header class="page-header">
     <div>
       <h1>Manage Titles</h1>
@@ -13,6 +14,9 @@
     </button>
   </header>
 
+
+
+  <!-- dashboard cards -->
   <section class="dashboard-grid">
 
     <div class="dashboard-card">
@@ -27,20 +31,13 @@
       <span class="dashboard-note">priced titles</span>
     </div>
 
-    <div class="dashboard-card">
-      <span class="dashboard-label">YTD Sales</span>
-      <strong>{{ totalYtdSales }}</strong>
-      <span class="dashboard-note">total sales count</span>
-    </div>
-
-    <div class="dashboard-card dashboard-card-blue">
-      <span class="dashboard-label">Average Price</span>
-      <strong>${{ averagePrice }}</strong>
-      <span class="dashboard-note">priced titles only</span>
-    </div>
+    
 
   </section>
 
+
+
+  <!-- messages -->
   @if (errorMessage) {
     <div class="message error-message">
       {{ errorMessage }}
@@ -61,10 +58,13 @@
 
   @if (isSaving) {
     <div class="message loading-message">
-      Saving title changes...
+      Processing title request...
     </div>
   }
 
+
+
+  <!-- create / edit form -->
   @if (showTitleForm) {
     <section class="form-card">
 
@@ -218,6 +218,9 @@
     </section>
   }
 
+
+
+  <!-- filter area -->
   <section class="filter-card">
 
     <button class="filter-toggle" type="button" (click)="toggleFilters()">
@@ -310,6 +313,9 @@
 
   </section>
 
+
+
+  <!-- titles table -->
   <section class="table-card">
 
     @if (!isLoading && filteredTitles.length === 0) {
@@ -340,9 +346,13 @@
         @for (title of pagedTitles; track title.title_id) {
           <tr>
             <td>{{ title.title_id }}</td>
+
             <td>{{ title.title }}</td>
+
             <td>{{ title.type }}</td>
+
             <td>{{ title.pub_name || title.pub_id }}</td>
+
             <td>
               @if (title.price !== null) {
                 ${{ title.price }}
@@ -350,6 +360,7 @@
                 -
               }
             </td>
+
             <td>
               @if (title.royalty !== null) {
                 {{ title.royalty }}%
@@ -357,10 +368,14 @@
                 -
               }
             </td>
+
             <td>{{ title.ytd_sales ?? 0 }}</td>
+
             <td>{{ title.pubdate | date:'mediumDate' }}</td>
+
             <td>
               <div class="action-buttons">
+
                 <button
                   class="btn btn-small btn-edit"
                   type="button"
@@ -369,6 +384,7 @@
                   Edit
                 </button>
 
+                <!-- this opens custom popup instead of ugly browser confirm -->
                 <button
                   class="btn btn-small btn-danger"
                   type="button"
@@ -376,6 +392,7 @@
                   (click)="deleteTitle(title)">
                   Delete
                 </button>
+
               </div>
             </td>
           </tr>
@@ -389,6 +406,9 @@
       </tbody>
     </table>
 
+
+
+    <!-- pagination -->
     <div class="pagination-bar">
 
       <div class="pagination-info">
@@ -450,5 +470,60 @@
     </div>
 
   </section>
+
+
+
+  <!-- fancy delete popup -->
+  @if (showConfirmModal) {
+    <div class="confirm-overlay">
+
+      <div class="confirm-modal danger-modal">
+
+        <div class="confirm-icon danger-icon">
+          <mat-icon>delete_forever</mat-icon>
+        </div>
+
+        <h2>{{ getDeleteConfirmTitle() }}</h2>
+
+        <p class="confirm-name">
+          <strong>{{ getSelectedTitleName() }}</strong>
+        </p>
+
+        <p class="confirm-id">
+          Title ID:
+          <strong>{{ getSelectedTitleId() }}</strong>
+        </p>
+
+        <p class="confirm-message">
+          {{ getDeleteConfirmMessage() }}
+        </p>
+
+        <div class="confirm-warning">
+          If sales, authors, or royalty schedules are connected to this title,
+          the system will block the delete.
+        </div>
+
+        <div class="confirm-actions">
+          <button
+            class="btn btn-secondary"
+            type="button"
+            [disabled]="isSaving"
+            (click)="closeConfirmModal()">
+            Cancel
+          </button>
+
+          <button
+            class="btn btn-danger"
+            type="button"
+            [disabled]="isSaving"
+            (click)="confirmDeleteTitle()">
+            Delete Title
+          </button>
+        </div>
+
+      </div>
+
+    </div>
+  }
 
 </div>

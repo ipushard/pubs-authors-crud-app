@@ -1,5 +1,6 @@
 <div class="manage-page">
 
+  <!-- top black header -->
   <header class="page-header">
     <div>
       <h1>Manage Jobs</h1>
@@ -13,6 +14,9 @@
     </button>
   </header>
 
+
+
+  <!-- dashboard cards -->
   <section class="dashboard-grid">
 
     <div class="dashboard-card">
@@ -21,26 +25,13 @@
       <span class="dashboard-note">job records</span>
     </div>
 
-    <div class="dashboard-card">
-      <span class="dashboard-label">Lowest Min Level</span>
-      <strong>{{ lowestMinLevel }}</strong>
-      <span class="dashboard-note">minimum job level</span>
-    </div>
-
-    <div class="dashboard-card">
-      <span class="dashboard-label">Highest Max Level</span>
-      <strong>{{ highestMaxLevel }}</strong>
-      <span class="dashboard-note">maximum job level</span>
-    </div>
-
-    <div class="dashboard-card dashboard-card-blue">
-      <span class="dashboard-label">Average Range</span>
-      <strong>{{ averageLevelRange }}</strong>
-      <span class="dashboard-note">level spread</span>
-    </div>
+    
 
   </section>
 
+
+
+  <!-- page messages -->
   @if (errorMessage) {
     <div class="message error-message">
       {{ errorMessage }}
@@ -61,10 +52,13 @@
 
   @if (isSaving) {
     <div class="message loading-message">
-      Saving job changes...
+      Processing job request...
     </div>
   }
 
+
+
+  <!-- create / edit form -->
   @if (showJobForm) {
     <section class="form-card">
 
@@ -137,6 +131,9 @@
     </section>
   }
 
+
+
+  <!-- filter area -->
   <section class="filter-card">
 
     <button class="filter-toggle" type="button" (click)="toggleFilters()">
@@ -193,6 +190,9 @@
 
   </section>
 
+
+
+  <!-- jobs table -->
   <section class="table-card">
 
     @if (!isLoading && filteredJobs.length === 0) {
@@ -220,12 +220,18 @@
         @for (job of pagedJobs; track job.job_id) {
           <tr>
             <td>{{ job.job_id }}</td>
+
             <td>{{ job.job_desc }}</td>
+
             <td>{{ job.min_lvl }}</td>
+
             <td>{{ job.max_lvl }}</td>
+
             <td>{{ job.max_lvl - job.min_lvl }}</td>
+
             <td>
               <div class="action-buttons">
+
                 <button
                   class="btn btn-small btn-edit"
                   type="button"
@@ -234,6 +240,7 @@
                   Edit
                 </button>
 
+                <!-- this opens custom popup instead of ugly browser confirm -->
                 <button
                   class="btn btn-small btn-danger"
                   type="button"
@@ -241,6 +248,7 @@
                   (click)="deleteJob(job)">
                   Delete
                 </button>
+
               </div>
             </td>
           </tr>
@@ -254,6 +262,9 @@
       </tbody>
     </table>
 
+
+
+    <!-- pagination -->
     <div class="pagination-bar">
 
       <div class="pagination-info">
@@ -315,5 +326,60 @@
     </div>
 
   </section>
+
+
+
+  <!-- fancy delete popup -->
+  @if (showConfirmModal) {
+    <div class="confirm-overlay">
+
+      <div class="confirm-modal danger-modal">
+
+        <div class="confirm-icon danger-icon">
+          <mat-icon>delete_forever</mat-icon>
+        </div>
+
+        <h2>{{ getDeleteConfirmTitle() }}</h2>
+
+        <p class="confirm-name">
+          <strong>{{ getSelectedJobName() }}</strong>
+        </p>
+
+        <p class="confirm-id">
+          Job ID:
+          <strong>{{ getSelectedJobId() }}</strong>
+        </p>
+
+        <p class="confirm-message">
+          {{ getDeleteConfirmMessage() }}
+        </p>
+
+        <div class="confirm-warning">
+          If employees are assigned to this job, the system will block the delete.
+          Reassign those employees first if needed.
+        </div>
+
+        <div class="confirm-actions">
+          <button
+            class="btn btn-secondary"
+            type="button"
+            [disabled]="isSaving"
+            (click)="closeConfirmModal()">
+            Cancel
+          </button>
+
+          <button
+            class="btn btn-danger"
+            type="button"
+            [disabled]="isSaving"
+            (click)="confirmDeleteJob()">
+            Delete Job
+          </button>
+        </div>
+
+      </div>
+
+    </div>
+  }
 
 </div>
